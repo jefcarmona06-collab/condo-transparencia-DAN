@@ -631,14 +631,14 @@ interface DebtOverride {
   status: ReceivableStatus;
 }
 
-const P1 = 'Octubre 2026';
-const P2 = 'Septiembre - Octubre 2026';
-const P3 = 'Agosto - Octubre 2026';
+const P1 = 'Septiembre 2026';
+const P2 = 'Agosto y Septiembre 2026';
+const P3 = 'Julio a Septiembre 2026';
 
 const DEBT_OVERRIDES: Record<string, DebtOverride> = {
   // 4 o más recibos (convenio de pago)
-  '73-A': { months: 6, amount: 303.2, period: 'Mayo - Octubre 2026', status: 'Convenio de pago' },
-  '114-A': { months: 4, amount: 224.0, period: 'Julio - Octubre 2026', status: 'Convenio de pago' },
+  '73-A': { months: 6, amount: 303.2, period: 'Abril a Septiembre 2026', status: 'Convenio de pago' },
+  '114-A': { months: 4, amount: 224.0, period: 'Junio a Septiembre 2026', status: 'Convenio de pago' },
   // 3 recibos
   '22-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
   '53-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
@@ -679,7 +679,7 @@ export const ACCOUNTS_RECEIVABLE_LIST: ReceivableAccountItem[] = (() => {
         apt_in_floor: apt,
         pending_months: debt?.months ?? 0,
         bracket: bracketFromMonths(debt?.months ?? 0),
-        last_period: debt?.period ?? 'Solvente hasta Octubre 2026',
+        last_period: debt?.period ?? 'Solvente hasta Septiembre 2026',
         amount_usd: debt?.amount ?? 0,
         status: debt?.status ?? 'Al día',
       });
@@ -723,7 +723,7 @@ const GROUP_META: Array<
   {
     key: '1',
     title: 'Vecinos con 1 recibo',
-    subtitle: 'Corresponde al mes en curso',
+    subtitle: 'Corresponde al recibo de Septiembre',
     receipts_Label: '1 recibo',
     action_note: 'Recordatorio ordinario de pago',
     bar_color: '#0ea5e9',
@@ -733,7 +733,7 @@ const GROUP_META: Array<
   {
     key: '2',
     title: 'Vecinos con 2 recibos',
-    subtitle: 'Acumulado Septiembre + Octubre',
+    subtitle: 'Acumulado Agosto y Septiembre',
     receipts_Label: '2 recibos',
     action_note: 'Aviso administrativo bimestral',
     bar_color: '#6366f1',
@@ -743,7 +743,7 @@ const GROUP_META: Array<
   {
     key: '3',
     title: 'Vecinos con 3 recibos',
-    subtitle: 'Acumulado Agosto a Octubre',
+    subtitle: 'Acumulado Julio a Septiembre',
     receipts_Label: '3 recibos',
     action_note: 'Citación con la Junta de Condominio',
     bar_color: '#f59e0b',

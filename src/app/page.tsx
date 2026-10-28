@@ -24,6 +24,7 @@ import {
 import {
   downloadInvoicePdf,
   downloadAccountsReceivableWhatsappPdf,
+  downloadExpensesSummaryCardsPdf,
   formatNumberVe,
 } from '@/lib/pdf-generator';
 import InvoiceModal from '@/components/InvoiceModal';
@@ -281,26 +282,26 @@ export default function ResidenciasDanPortal() {
   const [debtFileName, setDebtFileName] = useState<string>('');
   const [debtRelationText, setDebtRelationText] = useState<string>(
     `apartamento,recibos_pendientes,monto_usd,periodos,situacion
-"73-A",6,303.20,"Mayo - Octubre 2026","Convenio de pago"
-"114-A",4,224.00,"Julio - Octubre 2026","Convenio de pago"
-"22-A",3,134.20,"Agosto - Octubre 2026","Cuenta por cobrar"
-"53-A",3,134.20,"Agosto - Octubre 2026","Cuenta por cobrar"
-"84-A",3,134.20,"Agosto - Octubre 2026","Cuenta por cobrar"
-"124-A",3,134.20,"Agosto - Octubre 2026","Cuenta por cobrar"
-"14-A",2,94.60,"Septiembre - Octubre 2026","Cuenta por cobrar"
-"31-A",2,94.60,"Septiembre - Octubre 2026","Cuenta por cobrar"
-"62-A",2,94.60,"Septiembre - Octubre 2026","Cuenta por cobrar"
-"93-A",2,94.60,"Septiembre - Octubre 2026","Cuenta por cobrar"
-"104-A",2,94.60,"Septiembre - Octubre 2026","Cuenta por cobrar"
-"12-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"23-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"34-A",1,52.80,"Octubre 2026","En verificación"
-"51-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"64-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"82-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"91-A",1,52.80,"Octubre 2026","En verificación"
-"133-A",1,52.80,"Octubre 2026","Cuenta por cobrar"
-"151-A",1,52.80,"Octubre 2026","Cuenta por cobrar"`
+"73-A",6,303.20,"Abril a Septiembre 2026","Convenio de pago"
+"114-A",4,224.00,"Junio a Septiembre 2026","Convenio de pago"
+"22-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
+"53-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
+"84-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
+"124-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
+"14-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"31-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"62-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"93-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"104-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"12-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"23-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"34-A",1,52.80,"Septiembre 2026","En verificación"
+"51-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"64-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"82-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"91-A",1,52.80,"Septiembre 2026","En verificación"
+"133-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
+"151-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"`
   );
 
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
@@ -361,7 +362,7 @@ export default function ResidenciasDanPortal() {
       const savedPeriods = localStorage.getItem('dan_v1_periods');
       if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
 
-      const savedReceivables = localStorage.getItem('dan_v1_receivables');
+      const savedReceivables = localStorage.getItem('dan_v2_receivables');
       if (savedReceivables) setReceivablesList(JSON.parse(savedReceivables));
 
       const savedBalance = localStorage.getItem('dan_v1_bank_balance');
@@ -396,7 +397,7 @@ export default function ResidenciasDanPortal() {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
       localStorage.setItem('dan_v1_periods', JSON.stringify(periods));
-      localStorage.setItem('dan_v1_receivables', JSON.stringify(receivablesList));
+      localStorage.setItem('dan_v2_receivables', JSON.stringify(receivablesList));
       localStorage.setItem('dan_v1_bank_balance', bankBalanceUsd.toString());
       localStorage.setItem('dan_v1_bank_details', JSON.stringify(bankDetails));
       localStorage.setItem('dan_v1_board_members', JSON.stringify(boardMembers));
@@ -581,18 +582,50 @@ export default function ResidenciasDanPortal() {
   }, [periodExpenses, searchQuery, categoryFilter]);
 
   // Resumen dinámico por grupo de deuda calculado desde receivablesList
+  // Considerando que los recibos se emiten al cierre de cada mes (ej. en Octubre se cobra Septiembre; 2 recibos = Agosto y Septiembre)
   const dynamicDebtGroupsSummary = useMemo(() => {
+    const monthNames = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+    const currentMonthNum = activePeriod?.month || 10; // 1..12
+    const prev1 = monthNames[(currentMonthNum - 2 + 12) % 12]; // Ej. en Octubre (10) -> Septiembre
+    const prev2 = monthNames[(currentMonthNum - 3 + 12) % 12]; // Ej. en Octubre (10) -> Agosto
+    const prev3 = monthNames[(currentMonthNum - 4 + 12) % 12]; // Ej. en Octubre (10) -> Julio
+
     return DEBT_GROUPS_SUMMARY.map((meta) => {
       const units = receivablesList.filter((u) => u.bracket === meta.key);
       const subtotal = +units.reduce((acc, u) => acc + u.amount_usd, 0).toFixed(2);
+      const dynamicSubtitle =
+        meta.key === '0'
+          ? 'Sin recibos pendientes de pago'
+          : meta.key === '1'
+          ? `Corresponde al recibo de ${prev1}`
+          : meta.key === '2'
+          ? `Acumulado ${prev2} y ${prev1}`
+          : meta.key === '3'
+          ? `Acumulado ${prev3} a ${prev1}`
+          : 'Deuda de larga data';
+
       return {
         ...meta,
+        subtitle: dynamicSubtitle,
         apartments_count: units.length,
         subtotal_usd: subtotal,
         amount_per_unit_usd: units.length ? +(subtotal / units.length).toFixed(2) : 0,
       };
     });
-  }, [receivablesList]);
+  }, [receivablesList, activePeriod]);
 
   // Excluye vecinos solventes y deja únicamente los que poseen deuda
   const debtOnlyList = useMemo(
@@ -2488,13 +2521,30 @@ export default function ResidenciasDanPortal() {
                 </div>
 
                 {activeRole === 'junta' && (
-                  <button
-                    onClick={() => setActiveTab('carga_junta')}
-                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1d4ed8] hover:bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Registrar Nueva Factura en Bolívares
-                  </button>
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadExpensesSummaryCardsPdf(
+                          CONDOMINIUM_DATA,
+                          activePeriod,
+                          periodExpenses
+                        )
+                      }
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-white hover:bg-indigo-50/70 border border-indigo-200 px-4 py-2.5 text-xs font-extrabold text-[#1d4ed8] shadow-xs transition"
+                    >
+                      <Download className="h-4 w-4" />
+                      Descargar Resumen PDF en Tarjetas ({activePeriod.label})
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('carga_junta')}
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1d4ed8] hover:bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Registrar Nueva Factura en Bolívares
+                    </button>
+                  </div>
                 )}
               </div>
 
