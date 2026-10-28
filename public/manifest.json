@@ -1,0 +1,19 @@
+{
+  "name": "Residencias DAN Torre A — Condominio",
+  "short_name": "DAN Torre A",
+  "description": "Aplicación Móvil de Transparencia Financiera, Facturas PDF y Cuentas por Cobrar — Residencias DAN Torre A (RIF J-29495522-3)",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
