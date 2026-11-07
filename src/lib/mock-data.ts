@@ -82,13 +82,13 @@ export const INITIAL_PERIODS: MonthlyPeriod[] = [
     exchange_rate_bs: 54.85,
     total_income_usd: 3180.0,
     total_expense_usd: 2880.0, // Exactamente $40.00 USD por apartamento ($2,880 / 72 = $40.00)
-    accounts_receivable_usd: 2012.2, // Total acumulado en cuentas por cobrar de los 20 apartamentos con recibos pendientes
-    solvent_units_count: 52,
-    receivable_units_count: 20,
+    accounts_receivable_usd: 1973.9, // Total acumulado según relación oficial de cuentas por cobrar ($1.973,90)
+    solvent_units_count: 36,
+    receivable_units_count: 36,
     published_by: 'Junta de Condominio — Residencias DAN Torre A',
-    published_at: '2026-10-16',
+    published_at: '2026-11-06',
     notes:
-      'Relación de ingresos y gastos de Octubre 2026 cerrada y soportada con sus respectivas facturas.',
+      'Relación de ingresos, gastos y cuentas por cobrar actualizada al 6 de noviembre de 2026.',
   },
   {
     id: 'per-2026-09',
@@ -131,9 +131,9 @@ export const INITIAL_PERIODS: MonthlyPeriod[] = [
     exchange_rate_bs: 55.40,
     total_income_usd: 1420.0,
     total_expense_usd: 1296.0, // $1,296 / 72 = $18.00 USD parcial
-    accounts_receivable_usd: 2180.0,
-    solvent_units_count: 34,
-    receivable_units_count: 38,
+    accounts_receivable_usd: 1973.9,
+    solvent_units_count: 36,
+    receivable_units_count: 36,
     notes: 'Relación en proceso de carga por la Junta de Condominio.',
   },
   {
@@ -698,31 +698,61 @@ const P1 = 'Septiembre 2026';
 const P2 = 'Agosto y Septiembre 2026';
 const P3 = 'Julio a Septiembre 2026';
 
+// Relación oficial de Cuentas por Cobrar actualizada al 06/11/2026 (36 con deuda / 36 solventes = $1.973,90 USD)
 const DEBT_OVERRIDES: Record<string, DebtOverride> = {
-  // 4 o más recibos (convenio de pago)
-  '73-A': { months: 6, amount: 303.2, period: 'Abril a Septiembre 2026', status: 'Convenio de pago' },
-  '114-A': { months: 4, amount: 224.0, period: 'Junio a Septiembre 2026', status: 'Convenio de pago' },
-  // 3 recibos
-  '22-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
-  '53-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
-  '84-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
-  '124-A': { months: 3, amount: 134.2, period: P3, status: 'Cuenta por cobrar' },
-  // 2 recibos
-  '14-A': { months: 2, amount: 94.6, period: P2, status: 'Cuenta por cobrar' },
-  '31-A': { months: 2, amount: 94.6, period: P2, status: 'Cuenta por cobrar' },
-  '62-A': { months: 2, amount: 94.6, period: P2, status: 'Cuenta por cobrar' },
-  '93-A': { months: 2, amount: 94.6, period: P2, status: 'Cuenta por cobrar' },
-  '104-A': { months: 2, amount: 94.6, period: P2, status: 'Cuenta por cobrar' },
-  // 1 recibo
-  '12-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '23-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '34-A': { months: 1, amount: 52.8, period: P1, status: 'En verificación' },
-  '51-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '64-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '82-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '91-A': { months: 1, amount: 52.8, period: P1, status: 'En verificación' },
-  '133-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
-  '151-A': { months: 1, amount: 52.8, period: P1, status: 'Cuenta por cobrar' },
+  // Piso 1
+  '12-A': { months: 3, amount: 27.3, period: P3, status: 'Cuenta por cobrar' }, // 012
+  // Piso 3
+  '31-A': { months: 54, amount: 457.47, period: '54 recibos acumulados', status: 'Convenio de pago' }, // 031
+  '32-A': { months: 2, amount: 15.77, period: P2, status: 'Cuenta por cobrar' }, // 032
+  '34-A': { months: 1, amount: 6.27, period: P1, status: 'Cuenta por cobrar' }, // 034
+  // Piso 4
+  '41-A': { months: 2, amount: 7.52, period: P2, status: 'Cuenta por cobrar' }, // 041
+  '42-A': { months: 3, amount: 27.13, period: P3, status: 'Cuenta por cobrar' }, // 042
+  '44-A': { months: 2, amount: 13.38, period: P2, status: 'Cuenta por cobrar' }, // 044
+  // Piso 5
+  '52-A': { months: 4, amount: 33.22, period: 'Junio a Septiembre 2026', status: 'Cuenta por cobrar' }, // 052
+  '53-A': { months: 3, amount: 27.21, period: P3, status: 'Cuenta por cobrar' }, // 053
+  '54-A': { months: 6, amount: 46.55, period: 'Abril a Septiembre 2026', status: 'Cuenta por cobrar' }, // 054
+  // Piso 6
+  '61-A': { months: 28, amount: 264.95, period: '28 recibos acumulados', status: 'Convenio de pago' }, // 061
+  '62-A': { months: 7, amount: 54.62, period: 'Marzo a Septiembre 2026', status: 'Cuenta por cobrar' }, // 062
+  // Piso 7
+  '71-A': { months: 7, amount: 53.82, period: 'Marzo a Septiembre 2026', status: 'Cuenta por cobrar' }, // 071
+  '73-A': { months: 3, amount: 22.07, period: P3, status: 'Cuenta por cobrar' }, // 073
+  '74-A': { months: 5, amount: 39.2, period: 'Mayo a Septiembre 2026', status: 'Cuenta por cobrar' }, // 074
+  // Piso 8
+  '81-A': { months: 2, amount: 15.25, period: P2, status: 'Cuenta por cobrar' }, // 081
+  '82-A': { months: 4, amount: 33.33, period: 'Junio a Septiembre 2026', status: 'Cuenta por cobrar' }, // 082
+  '84-A': { months: 1, amount: 0.03, period: P1, status: 'Cuenta por cobrar' }, // 084
+  // Piso 9
+  '91-A': { months: 3, amount: 27.3, period: P3, status: 'Cuenta por cobrar' }, // 091
+  '92-A': { months: 1, amount: 6.27, period: P1, status: 'Cuenta por cobrar' }, // 092
+  '94-A': { months: 3, amount: 25.56, period: P3, status: 'Cuenta por cobrar' }, // 094
+  // Piso 10
+  '101-A': { months: 2, amount: 6.28, period: P2, status: 'Cuenta por cobrar' }, // 101
+  // Piso 11
+  '111-A': { months: 1, amount: 5.59, period: P1, status: 'Cuenta por cobrar' }, // 111
+  '112-A': { months: 1, amount: 5.92, period: P1, status: 'Cuenta por cobrar' }, // 112
+  '113-A': { months: 2, amount: 15.32, period: P2, status: 'Cuenta por cobrar' }, // 113
+  // Piso 12
+  '122-A': { months: 20, amount: 208.11, period: '20 recibos acumulados', status: 'Convenio de pago' }, // 122
+  '124-A': { months: 1, amount: 5.69, period: P1, status: 'Cuenta por cobrar' }, // 124
+  // Piso 13
+  '132-A': { months: 1, amount: 6.27, period: P1, status: 'Cuenta por cobrar' }, // 132
+  '133-A': { months: 11, amount: 94.82, period: '11 recibos acumulados', status: 'Convenio de pago' }, // 133
+  '134-A': { months: 14, amount: 119.64, period: '14 recibos acumulados', status: 'Convenio de pago' }, // 134
+  // Piso 14
+  '144-A': { months: 1, amount: 6.27, period: P1, status: 'Cuenta por cobrar' }, // 144
+  // Piso 15
+  '152-A': { months: 2, amount: 11.93, period: P2, status: 'Cuenta por cobrar' }, // 152
+  // Piso 16
+  '162-A': { months: 12, amount: 101.69, period: '12 recibos acumulados', status: 'Convenio de pago' }, // 162
+  // Piso 17
+  '172-A': { months: 18, amount: 170.65, period: '18 recibos acumulados', status: 'Convenio de pago' }, // 172
+  // Piso 18
+  '182-A': { months: 1, amount: 6.27, period: P1, status: 'Cuenta por cobrar' }, // 182
+  '184-A': { months: 1, amount: 5.23, period: P1, status: 'Cuenta por cobrar' }, // 184
 };
 
 const bracketFromMonths = (months: number): DebtBracketKey =>

@@ -291,26 +291,42 @@ export default function ResidenciasDanPortal() {
   const [debtFileName, setDebtFileName] = useState<string>('');
   const [debtRelationText, setDebtRelationText] = useState<string>(
     `apartamento,recibos_pendientes,monto_usd,periodos,situacion
-"73-A",6,303.20,"Abril a Septiembre 2026","Convenio de pago"
-"114-A",4,224.00,"Junio a Septiembre 2026","Convenio de pago"
-"22-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
-"53-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
-"84-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
-"124-A",3,134.20,"Julio a Septiembre 2026","Cuenta por cobrar"
-"14-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
-"31-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
-"62-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
-"93-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
-"104-A",2,94.60,"Agosto y Septiembre 2026","Cuenta por cobrar"
-"12-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"23-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"34-A",1,52.80,"Septiembre 2026","En verificación"
-"51-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"64-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"82-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"91-A",1,52.80,"Septiembre 2026","En verificación"
-"133-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"
-"151-A",1,52.80,"Septiembre 2026","Cuenta por cobrar"`
+"12-A",3,27.30,"Julio a Septiembre 2026","Cuenta por cobrar"
+"31-A",54,457.47,"54 recibos acumulados","Convenio de pago"
+"32-A",2,15.77,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"34-A",1,6.27,"Septiembre 2026","Cuenta por cobrar"
+"41-A",2,7.52,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"42-A",3,27.13,"Julio a Septiembre 2026","Cuenta por cobrar"
+"44-A",2,13.38,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"52-A",4,33.22,"Junio a Septiembre 2026","Cuenta por cobrar"
+"53-A",3,27.21,"Julio a Septiembre 2026","Cuenta por cobrar"
+"54-A",6,46.55,"Abril a Septiembre 2026","Cuenta por cobrar"
+"61-A",28,264.95,"28 recibos acumulados","Convenio de pago"
+"62-A",7,54.62,"Marzo a Septiembre 2026","Cuenta por cobrar"
+"71-A",7,53.82,"Marzo a Septiembre 2026","Cuenta por cobrar"
+"73-A",3,22.07,"Julio a Septiembre 2026","Cuenta por cobrar"
+"74-A",5,39.20,"Mayo a Septiembre 2026","Cuenta por cobrar"
+"81-A",2,15.25,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"82-A",4,33.33,"Junio a Septiembre 2026","Cuenta por cobrar"
+"84-A",1,0.03,"Septiembre 2026","Cuenta por cobrar"
+"91-A",3,27.30,"Julio a Septiembre 2026","Cuenta por cobrar"
+"92-A",1,6.27,"Septiembre 2026","Cuenta por cobrar"
+"94-A",3,25.56,"Julio a Septiembre 2026","Cuenta por cobrar"
+"101-A",2,6.28,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"111-A",1,5.59,"Septiembre 2026","Cuenta por cobrar"
+"112-A",1,5.92,"Septiembre 2026","Cuenta por cobrar"
+"113-A",2,15.32,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"122-A",20,208.11,"20 recibos acumulados","Convenio de pago"
+"124-A",1,5.69,"Septiembre 2026","Cuenta por cobrar"
+"132-A",1,6.27,"Septiembre 2026","Cuenta por cobrar"
+"133-A",11,94.82,"11 recibos acumulados","Convenio de pago"
+"134-A",14,119.64,"14 recibos acumulados","Convenio de pago"
+"144-A",1,6.27,"Septiembre 2026","Cuenta por cobrar"
+"152-A",2,11.93,"Agosto y Septiembre 2026","Cuenta por cobrar"
+"162-A",12,101.69,"12 recibos acumulados","Convenio de pago"
+"172-A",18,170.65,"18 recibos acumulados","Convenio de pago"
+"182-A",1,6.27,"Septiembre 2026","Cuenta por cobrar"
+"184-A",1,5.23,"Septiembre 2026","Cuenta por cobrar"`
   );
 
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
@@ -370,10 +386,10 @@ export default function ResidenciasDanPortal() {
       const savedExpenses = localStorage.getItem('dan_v1_expenses');
       if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
 
-      const savedPeriods = localStorage.getItem('dan_v1_periods');
+      const savedPeriods = localStorage.getItem('dan_v2_periods');
       if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
 
-      const savedReceivables = localStorage.getItem('dan_v2_receivables');
+      const savedReceivables = localStorage.getItem('dan_v3_receivables');
       if (savedReceivables) setReceivablesList(JSON.parse(savedReceivables));
 
       const savedBalance = localStorage.getItem('dan_v1_bank_balance');
@@ -410,8 +426,8 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
-      localStorage.setItem('dan_v1_periods', JSON.stringify(periods));
-      localStorage.setItem('dan_v2_receivables', JSON.stringify(receivablesList));
+      localStorage.setItem('dan_v2_periods', JSON.stringify(periods));
+      localStorage.setItem('dan_v3_receivables', JSON.stringify(receivablesList));
       localStorage.setItem('dan_v1_bank_balance', bankBalanceUsd.toString());
       localStorage.setItem('dan_v1_bank_details', JSON.stringify(bankDetails));
       localStorage.setItem('dan_v1_board_members', JSON.stringify(boardMembers));
@@ -1166,9 +1182,10 @@ export default function ResidenciasDanPortal() {
         return;
       }
 
-      const unitRaw = cols[0].toUpperCase();
+      const rawUnitStr = cols[0].toUpperCase().replace(/^0+/, '');
+      const unitRaw = rawUnitStr.endsWith('-A') ? rawUnitStr : `${rawUnitStr}-A`;
       const months = parseInt(cols[1], 10);
-      const amountUsd = parseFloat(cols[2]);
+      const amountUsd = parseFloat(cols[2].replace(',', '.'));
       const periodStr = cols[3] || activePeriod.label;
       const statusRaw = (cols[4] || 'Cuenta por cobrar') as ReceivableStatus;
 
@@ -3006,7 +3023,7 @@ export default function ResidenciasDanPortal() {
                           <span className="text-[11px] font-mono font-semibold text-slate-500">
                             RIF: {exp.supplier_tax_id}
                           </span>
-                          {exp.storage_path && (
+                          {activeRole === 'junta' && exp.storage_path && (
                             <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
                               Ruta: /{exp.storage_path}
                             </span>
@@ -3380,7 +3397,7 @@ export default function ResidenciasDanPortal() {
                         </div>
                       </div>
 
-                      {proj.storage_path && (
+                      {activeRole === 'junta' && proj.storage_path && (
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-white rounded-lg px-2.5 py-1.5 border border-slate-200/70">
                           <span className="truncate">Archivo: /{proj.storage_path}</span>
                           <span className="text-emerald-700 font-bold shrink-0 ml-2">
@@ -3885,113 +3902,115 @@ export default function ResidenciasDanPortal() {
                 )}
               </div>
 
-              {/* TARJETA 5: RESPALDO CONTABLE, CONTINUIDAD Y ALMACENAMIENTO (4 PILARES) */}
-              <div className={`${lightGrayCardClass} p-4 space-y-3.5`}>
-                <div className="flex items-start justify-between gap-2 border-b border-slate-200 pb-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-sm">
-                      <Database className="h-4 w-4" />
+              {/* TARJETA 5: RESPALDO CONTABLE, CONTINUIDAD Y ALMACENAMIENTO (EXCLUSIVO JUNTA) */}
+              {activeRole === 'junta' && (
+                <div className={`${lightGrayCardClass} p-4 space-y-3.5`}>
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-200 pb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 shadow-sm">
+                        <Database className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900">
+                          Continuidad, Seguridad y Respaldos (3+ Años)
+                        </h3>
+                        <p className="text-[11px] font-semibold text-slate-600">
+                          Persistencia LocalStorage + Arquitectura Supabase Blindada
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900">
-                        Continuidad, Seguridad y Respaldos (3+ Años)
-                      </h3>
-                      <p className="text-[11px] font-semibold text-slate-600">
-                        Persistencia LocalStorage + Arquitectura Supabase Blindada
-                      </p>
+                    <span className="rounded-lg bg-emerald-100 border border-emerald-200 px-2 py-1 text-[10px] font-extrabold text-emerald-800 shrink-0">
+                      Solo Junta
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
+                      <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                        1. Keep-Alive Automático
+                      </span>
+                      <strong className="text-slate-900 font-black block mt-0.5">
+                        Lun y Jue (09:00 UTC)
+                      </strong>
+                      <span className="text-[10px] text-emerald-700 font-semibold">
+                        Endpoint /api/health
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
+                      <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                        2. Seguridad Contable
+                      </span>
+                      <strong className="text-slate-900 font-black block mt-0.5">
+                        Sin Borrado Físico
+                      </strong>
+                      <span className="text-[10px] text-[#1d4ed8] font-semibold">
+                        RLS 100% + URLs Firmadas
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
+                      <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                        3. Higiene Storage
+                      </span>
+                      <strong className="text-slate-900 font-black block mt-0.5">
+                        /YYYY/MM/ • Máx 3 MB
+                      </strong>
+                      <span className="text-[10px] text-emerald-700 font-semibold">
+                        Compresión WebP Cliente
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
+                      <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                        4. Persistencia Actual
+                      </span>
+                      <strong className="text-slate-900 font-black block mt-0.5">
+                        LocalStorage + Nube
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        Listo para Vercel
+                      </span>
                     </div>
                   </div>
-                  <span className="rounded-lg bg-emerald-100 border border-emerald-200 px-2 py-1 text-[10px] font-extrabold text-emerald-800 shrink-0">
-                    Activo
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
-                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
-                      1. Keep-Alive Automático
-                    </span>
-                    <strong className="text-slate-900 font-black block mt-0.5">
-                      Lun y Jue (09:00 UTC)
-                    </strong>
-                    <span className="text-[10px] text-emerald-700 font-semibold">
-                      Endpoint /api/health
-                    </span>
-                  </div>
+                  {/* Botones de Exportación y Verificación de Salud */}
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleExportHistoricalCsv}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 px-3.5 py-2.5 text-xs font-extrabold text-slate-800 shadow-xs transition"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                      Descargar Libro Histórico de Gastos (.CSV / Excel)
+                    </button>
 
-                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
-                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
-                      2. Seguridad Contable
-                    </span>
-                    <strong className="text-slate-900 font-black block mt-0.5">
-                      Sin Borrado Físico
-                    </strong>
-                    <span className="text-[10px] text-[#1d4ed8] font-semibold">
-                      RLS 100% + URLs Firmadas
-                    </span>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleExportFullBackupJson}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3.5 py-2.5 text-xs font-extrabold text-[#1d4ed8] transition"
+                    >
+                      <HardDriveDownload className="h-4 w-4" />
+                      Descargar Respaldo Espejo Completo (.JSON para Drive)
+                    </button>
 
-                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
-                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
-                      3. Higiene Storage
-                    </span>
-                    <strong className="text-slate-900 font-black block mt-0.5">
-                      /YYYY/MM/ • Máx 3 MB
-                    </strong>
-                    <span className="text-[10px] text-emerald-700 font-semibold">
-                      Compresión WebP Cliente
-                    </span>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleTestKeepAlive}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 text-[11px] font-extrabold text-emerald-800 transition"
+                    >
+                      <Activity className="h-3.5 w-3.5 text-emerald-600" />
+                      Probar Pulso Keep-Alive (/api/health)
+                    </button>
 
-                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/90">
-                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
-                      4. Persistencia Actual
-                    </span>
-                    <strong className="text-slate-900 font-black block mt-0.5">
-                      LocalStorage + Nube
-                    </strong>
-                    <span className="text-[10px] text-slate-500 font-semibold">
-                      Listo para Vercel
-                    </span>
+                    {healthPingResult && (
+                      <div className="rounded-xl bg-slate-900 text-emerald-300 font-mono text-[10px] p-2.5 border border-slate-700">
+                        {healthPingResult}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Botones de Exportación y Verificación de Salud */}
-                <div className="space-y-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleExportHistoricalCsv}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 px-3.5 py-2.5 text-xs font-extrabold text-slate-800 shadow-xs transition"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                    Descargar Libro Histórico de Gastos (.CSV / Excel)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleExportFullBackupJson}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3.5 py-2.5 text-xs font-extrabold text-[#1d4ed8] transition"
-                  >
-                    <HardDriveDownload className="h-4 w-4" />
-                    Descargar Respaldo Espejo Completo (.JSON para Drive)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleTestKeepAlive}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 text-[11px] font-extrabold text-emerald-800 transition"
-                  >
-                    <Activity className="h-3.5 w-3.5 text-emerald-600" />
-                    Probar Pulso Keep-Alive (/api/health)
-                  </button>
-
-                  {healthPingResult && (
-                    <div className="rounded-xl bg-slate-900 text-emerald-300 font-mono text-[10px] p-2.5 border border-slate-700">
-                      {healthPingResult}
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
           )}
 
