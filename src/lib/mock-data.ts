@@ -6,7 +6,15 @@ import {
   Expense,
   UnitReceipt,
   CondoProject,
+  CondoFundsConfig,
 } from '@/types/condo';
+
+export const INITIAL_FUNDS_CONFIG: CondoFundsConfig = {
+  operating_fund_initial_usd: 1200.0, // Saldo anterior disponible en Fondo Operativo
+  operating_fund_monthly_fixed_usd: 360.0, // Monto mensual fijo cobrado en recibo ($5,00 / apto)
+  reserve_fund_initial_usd: 6480.0, // Saldo acumulado en Fondo de Reserva
+  reserve_fund_monthly_usd: 288.0, // Aporte mensual al Fondo de Reserva ($4,00 / apto)
+};
 
 export const CONDOMINIUM_DATA: CondominiumInfo = {
   id: 'residencias-dan-torre-a',
@@ -278,8 +286,63 @@ export const INITIAL_EXPENSES: Expense[] = [
     control_number: '00-552019',
     evidence_image_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%231e293b"/><rect x="20" y="20" width="560" height="360" rx="16" fill="%230f172a" stroke="%2338bdf8" stroke-width="2"/><circle cx="300" cy="150" r="60" fill="%23fef08a" opacity="0.95"/><rect x="288" y="55" width="24" height="40" fill="%2394a3b8" rx="4"/><line x1="300" y1="20" x2="300" y2="55" stroke="%23cbd5e1" stroke-width="4"/><text x="300" y="270" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="16" font-weight="bold">FOTO EVIDENCIA: LUMINARIAS LED 18W INSTALADAS</text><text x="300" y="300" text-anchor="middle" fill="%2338bdf8" font-family="sans-serif" font-size="13" font-weight="bold">Residencias DAN Torre A — Pasillos Pisos 1 al 12</text><text x="300" y="328" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="11">Factura FAC-015402 • Ferreter%C3%ADa San Juan C.A.</text></svg>',
     evidence_image_name: 'Foto_Lamparas_LED_Pisos_Torre_A.jpg',
+    funding_source: 'gasto_comun',
     audit_status: 'verificado',
     created_at: '2026-10-15T12:00:00Z',
+  },
+  {
+    id: 'exp-10-op-01',
+    period_id: 'per-2026-10',
+    category_id: 'cat-05',
+    category_name: 'Reparaciones Generales y Áreas Comunes',
+    supplier_name: 'Suministros y Ferretería El Tornillo C.A.',
+    supplier_tax_id: 'J-40291038-1',
+    description:
+      'Compra de bombillos de emergencia para escaleras, cerradura de cuarto de aseo y conectores eléctricos menores (Cargado al Fondo Operativo Fijo)',
+    amount: 144.0,
+    exchange_rate_bs: 54.85,
+    amount_bs: 7898.4,
+    unit_share_usd: 2.0,
+    unit_share_bs: 109.7,
+    expense_date: '2026-10-18',
+    invoice_url: 'torre-a/2026-10/FAC-008412-fondo-operativo.pdf',
+    invoice_number: 'FAC-008412',
+    control_number: '00-334910',
+    evidence_image_url:
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="560" height="360" rx="16" fill="%231e293b" stroke="%230d9488" stroke-width="3"/><rect x="200" y="95" width="200" height="120" rx="14" fill="%230f766e" opacity="0.9"/><text x="300" y="162" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="18" font-weight="bold">FONDO OPERATIVO</text><text x="300" y="268" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="15" font-weight="bold">EVIDENCIA: CERRADURA Y SUMINISTROS MENORES</text><text x="300" y="298" text-anchor="middle" fill="%235eead4" font-family="sans-serif" font-size="13" font-weight="bold">Justificaci%C3%B3n de Movimiento • FAC-008412 ($144,00 USD)</text></svg>',
+    evidence_image_name: 'Evidencia_Suministros_Fondo_Operativo.webp',
+    funding_source: 'fondo_operativo',
+    audit_status: 'verificado',
+    audit_comment:
+      'Gasto menor cubierto con el Fondo Operativo mensual fijo (No incrementa los gastos comunes variables).',
+    created_at: '2026-10-18T11:15:00Z',
+  },
+  {
+    id: 'exp-10-res-01',
+    period_id: 'per-2026-10',
+    category_id: 'cat-01',
+    category_name: 'Mantenimiento de Ascensores y Bombas',
+    supplier_name: 'Embobinados y Bombas Industriales Caracas C.A.',
+    supplier_tax_id: 'J-31094821-7',
+    description:
+      'Sustitución de emergencia de sello mecánico mayor y rodamientos SKF de bomba principal N° 2 (Ejecutado contra Fondo de Reserva)',
+    amount: 450.0,
+    exchange_rate_bs: 54.85,
+    amount_bs: 24682.5,
+    unit_share_usd: 6.25,
+    unit_share_bs: 342.81,
+    expense_date: '2026-10-20',
+    invoice_url: 'torre-a/2026-10/FAC-003910-fondo-reserva.pdf',
+    invoice_number: 'FAC-003910',
+    control_number: '00-619023',
+    evidence_image_url:
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="560" height="360" rx="16" fill="%231e293b" stroke="%23f59e0b" stroke-width="3"/><rect x="190" y="95" width="220" height="120" rx="14" fill="%23b45309" opacity="0.95"/><text x="300" y="162" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="18" font-weight="bold">FONDO DE RESERVA</text><text x="300" y="268" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="15" font-weight="bold">EVIDENCIA: SELLO MEC%C3%81NICO Y RODAMIENTOS BOMBA N%C2%B0 2</text><text x="300" y="298" text-anchor="middle" fill="%23fcd34d" font-family="sans-serif" font-size="13" font-weight="bold">Justificaci%C3%B3n de Movimiento • FAC-003910 ($450,00 USD)</text></svg>',
+    evidence_image_name: 'Evidencia_Reparacion_Mayor_Fondo_Reserva.webp',
+    funding_source: 'fondo_reserva',
+    audit_status: 'verificado',
+    audit_comment:
+      'Contingencia mayor aprobada por la Junta y pagada con disponibilidad del Fondo de Reserva.',
+    created_at: '2026-10-20T15:40:00Z',
   },
 
   // SEPTIEMBRE 2026 — Total Gastos Comunes: $2,736.00 USD ($38.00 por apartamento)

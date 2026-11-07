@@ -7,6 +7,7 @@ import {
   INITIAL_CATEGORIES,
   INITIAL_EXPENSES,
   INITIAL_PROJECTS,
+  INITIAL_FUNDS_CONFIG,
   ACCOUNTS_RECEIVABLE_LIST,
   DEBT_GROUPS_SUMMARY,
   DebtBracketKey,
@@ -17,6 +18,8 @@ import {
   UserRole,
   MonthlyPeriod,
   Expense,
+  ExpenseSource,
+  CondoFundsConfig,
   AuditStatus,
   CondoProject,
   ProjectStatus,
@@ -220,9 +223,15 @@ export default function ResidenciasDanPortal() {
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('per-2026-10');
 
-  // Filters for Facturas (Relación de Gastos)
+  // Filters for Facturas (Relación de Gastos y Movimientos de Fondos)
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [expenseSourceFilter, setExpenseSourceFilter] = useState<'ALL' | ExpenseSource>('ALL');
+
+  // Configuración de Fondos del Condominio (Fondo Operativo Fijo y Fondo de Reserva)
+  const [fundsConfig, setFundsConfig] = useState<CondoFundsConfig>(INITIAL_FUNDS_CONFIG);
+  const [showEditFundsModal, setShowEditFundsModal] = useState<boolean>(false);
+  const [tempFundsConfig, setTempFundsConfig] = useState<CondoFundsConfig>(INITIAL_FUNDS_CONFIG);
 
   // Filter for Cuentas por Cobrar Debt Groups
   const [selectedDebtBracket, setSelectedDebtBracket] = useState<DebtBracketKey>('ALL');
@@ -311,8 +320,10 @@ export default function ResidenciasDanPortal() {
   const [newSupplier, setNewSupplier] = useState('');
   const [newRif, setNewRif] = useState('');
   const [newCategory, setNewCategory] = useState(INITIAL_CATEGORIES[0].name);
+  const [newFundingSource, setNewFundingSource] = useState<ExpenseSource>('gasto_comun');
   const [newInvoiceNumber, setNewInvoiceNumber] = useState('');
   const [newControlNumber, setNewControlNumber] = useState('');
+  const [newAmountUsd, setNewAmountUsd] = useState('');
   const [newAmountBs, setNewAmountBs] = useState('');
   const [newExchangeRateBs, setNewExchangeRateBs] = useState('54.85');
   const [newDescription, setNewDescription] = useState('');
@@ -376,6 +387,9 @@ export default function ResidenciasDanPortal() {
 
       const savedProjects = localStorage.getItem('dan_v1_projects');
       if (savedProjects) setProjects(JSON.parse(savedProjects));
+
+      const savedFundsConfig = localStorage.getItem('dan_v1_funds_config');
+      if (savedFundsConfig) setFundsConfig(JSON.parse(savedFundsConfig));
     } catch (err) {
       console.warn('Error hidratando localStorage:', err);
     } finally {
@@ -402,6 +416,7 @@ export default function ResidenciasDanPortal() {
       localStorage.setItem('dan_v1_bank_details', JSON.stringify(bankDetails));
       localStorage.setItem('dan_v1_board_members', JSON.stringify(boardMembers));
       localStorage.setItem('dan_v1_projects', JSON.stringify(projects));
+      localStorage.setItem('dan_v1_funds_config', JSON.stringify(fundsConfig));
     } catch (e) {
       console.warn('Error guardando estado en localStorage:', e);
     }
@@ -412,6 +427,7 @@ export default function ResidenciasDanPortal() {
     bankDetails,
     boardMembers,
     projects,
+    fundsConfig,
     isStorageHydrated,
   ]);
 
@@ -577,9 +593,13 @@ export default function ResidenciasDanPortal() {
       const matchesCategory =
         categoryFilter === 'ALL' || exp.category_name === categoryFilter;
 
-      return matchesQuery && matchesCategory;
+      const expSource: ExpenseSource = exp.funding_source || 'gasto_comun';
+      const matchesSource =
+        expenseSourceFilter === 'ALL' || expSource === expenseSourceFilter;
+
+      return matchesQuery && matchesCategory && matchesSource;
     });
-  }, [periodExpenses, searchQuery, categoryFilter]);
+  }, [periodExpenses, searchQuery, categoryFilter, expenseSourceFilter]);
 
   // Resumen dinámico por grupo de deuda calculado desde receivablesList
   // Considerando que los recibos se emiten al cierre de cada mes (ej. en Octubre se cobra Septiembre; 2 recibos = Agosto y Septiembre)
@@ -646,15 +666,75 @@ export default function ResidenciasDanPortal() {
     [periodExpenses]
   );
 
-  // Total Gastos del Mes & Cuota por Apartamento (Monto / 72)
-  const totalPeriodExpensesUsd = useMemo(
-    () => activePeriodExpenses.reduce((sum, item) => sum + item.amount, 0),
+  // Separación Contable por Apartado / Fondo:
+  // 1) Gastos Comunes del Mes (variables que se dividen ÷ 72 en el recibo)
+  const commonPeriodExpenses = useMemo(
+    () =>
+      activePeriodExpenses.filter(
+        (item) => !item.funding_source || item.funding_source === 'gasto_comun'
+      ),
     [activePeriodExpenses]
+  );
+
+  // 2) Facturas cargadas contra el Fondo Operativo (monto mensual fijo cobrado en recibo)
+  const operatingFundExpenses = useMemo(
+    () => activePeriodExpenses.filter((item) => item.funding_source === 'fondo_operativo'),
+    [activePeriodExpenses]
+  );
+
+  // 3) Facturas cargadas contra el Fondo de Reserva
+  const reserveFundExpenses = useMemo(
+    () => activePeriodExpenses.filter((item) => item.funding_source === 'fondo_reserva'),
+    [activePeriodExpenses]
+  );
+
+  // Total Gastos Comunes del Mes & Cuota Variable por Apartamento (Monto ÷ 72)
+  const totalPeriodExpensesUsd = useMemo(
+    () => commonPeriodExpenses.reduce((sum, item) => sum + item.amount, 0),
+    [commonPeriodExpenses]
   );
 
   const sharePerApartmentUsd = useMemo(
     () => +(totalPeriodExpensesUsd / CONDOMINIUM_DATA.total_units).toFixed(2),
     [totalPeriodExpensesUsd]
+  );
+
+  // Cálculos de Disponibilidad y Movimientos del Fondo Operativo (Monto Fijo Mensual)
+  const totalOperatingSpentUsd = useMemo(
+    () => +operatingFundExpenses.reduce((sum, item) => sum + item.amount, 0).toFixed(2),
+    [operatingFundExpenses]
+  );
+  const operatingFundAvailableUsd = useMemo(
+    () =>
+      +(
+        fundsConfig.operating_fund_initial_usd +
+        fundsConfig.operating_fund_monthly_fixed_usd -
+        totalOperatingSpentUsd
+      ).toFixed(2),
+    [fundsConfig, totalOperatingSpentUsd]
+  );
+  const operatingFixedPerUnitUsd = useMemo(
+    () => +(fundsConfig.operating_fund_monthly_fixed_usd / CONDOMINIUM_DATA.total_units).toFixed(2),
+    [fundsConfig.operating_fund_monthly_fixed_usd]
+  );
+
+  // Cálculos de Disponibilidad y Movimientos del Fondo de Reserva
+  const totalReserveSpentUsd = useMemo(
+    () => +reserveFundExpenses.reduce((sum, item) => sum + item.amount, 0).toFixed(2),
+    [reserveFundExpenses]
+  );
+  const reserveFundAvailableUsd = useMemo(
+    () =>
+      +(
+        fundsConfig.reserve_fund_initial_usd +
+        fundsConfig.reserve_fund_monthly_usd -
+        totalReserveSpentUsd
+      ).toFixed(2),
+    [fundsConfig, totalReserveSpentUsd]
+  );
+  const reserveFixedPerUnitUsd = useMemo(
+    () => +(fundsConfig.reserve_fund_monthly_usd / CONDOMINIUM_DATA.total_units).toFixed(2),
+    [fundsConfig.reserve_fund_monthly_usd]
   );
 
   // Proyectos filtrados
@@ -866,6 +946,34 @@ export default function ResidenciasDanPortal() {
     setFeedbackMsg(`Saldo disponible en banco actualizado con éxito a $${formatNumberVe(newBal)} USD.`);
   };
 
+  // Guardar Configuración de Fondos (Fondo Operativo Fijo y Fondo de Reserva)
+  const handleSaveFundsConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      isNaN(tempFundsConfig.operating_fund_initial_usd) ||
+      tempFundsConfig.operating_fund_initial_usd < 0 ||
+      isNaN(tempFundsConfig.operating_fund_monthly_fixed_usd) ||
+      tempFundsConfig.operating_fund_monthly_fixed_usd < 0 ||
+      isNaN(tempFundsConfig.reserve_fund_initial_usd) ||
+      tempFundsConfig.reserve_fund_initial_usd < 0 ||
+      isNaN(tempFundsConfig.reserve_fund_monthly_usd) ||
+      tempFundsConfig.reserve_fund_monthly_usd < 0
+    ) {
+      setFormErrorMsg('Por favor ingresa montos válidos en dólares para los fondos.');
+      return;
+    }
+    setFundsConfig({
+      operating_fund_initial_usd: +tempFundsConfig.operating_fund_initial_usd.toFixed(2),
+      operating_fund_monthly_fixed_usd: +tempFundsConfig.operating_fund_monthly_fixed_usd.toFixed(2),
+      reserve_fund_initial_usd: +tempFundsConfig.reserve_fund_initial_usd.toFixed(2),
+      reserve_fund_monthly_usd: +tempFundsConfig.reserve_fund_monthly_usd.toFixed(2),
+    });
+    setShowEditFundsModal(false);
+    setFeedbackMsg(
+      'Saldos iniciales y montos fijos mensuales de Fondo Operativo y Fondo de Reserva actualizados con éxito.'
+    );
+  };
+
   // Guardar Datos Bancarios (Solo Junta)
   const handleSaveBankDetails = (e: React.FormEvent) => {
     e.preventDefault();
@@ -910,7 +1018,7 @@ export default function ResidenciasDanPortal() {
     setFeedbackMsg('Directorio de miembros de la Junta actualizado exitosamente.');
   };
 
-  // Aplicar Tasa Oficial de Cierre del Mes y Dolarizar Recibo (Solo Junta)
+  // Aplicar Tasa Oficial de Cierre del Mes y Actualizar Equivalente en Bs. (Protección contra Devaluación)
   const handleApplyClosingRate = (e: React.FormEvent) => {
     e.preventDefault();
     if (activeRole !== 'junta') return;
@@ -925,31 +1033,44 @@ export default function ResidenciasDanPortal() {
 
     const newRate = +rate.toFixed(2);
 
-    // 1. Recalcular las facturas del período con la nueva tasa de corte
+    // 1. Mantener las facturas guardadas en $ USD (protegidas contra devaluación) y actualizar su monto en Bs. con la tasa de cierre
     let updatedExpensesList = expenses;
     if (recalculateExpensesWithClosingRate) {
       updatedExpensesList = expenses.map((exp) => {
         if (exp.period_id !== activePeriod.id) return exp;
-        const newAmountUsd = +(exp.amount_bs / newRate).toFixed(2);
-        const shareUsd = +(newAmountUsd / CONDOMINIUM_DATA.total_units).toFixed(2);
-        const shareBs = +(exp.amount_bs / CONDOMINIUM_DATA.total_units).toFixed(2);
+        const fixedUsd = +exp.amount.toFixed(2);
+        const updatedAmountBs = +(fixedUsd * newRate).toFixed(2);
+        const shareUsd = +(fixedUsd / CONDOMINIUM_DATA.total_units).toFixed(2);
+        const updatedShareBs = +(updatedAmountBs / CONDOMINIUM_DATA.total_units).toFixed(2);
         return {
           ...exp,
+          original_amount_bs: exp.original_amount_bs ?? exp.amount_bs,
+          original_exchange_rate_bs: exp.original_exchange_rate_bs ?? exp.exchange_rate_bs,
           exchange_rate_bs: newRate,
-          amount: newAmountUsd,
+          amount: fixedUsd,
+          amount_bs: updatedAmountBs,
           unit_share_usd: shareUsd,
-          unit_share_bs: shareBs,
-          audit_comment: `Dolarizado al corte con tasa oficial de cierre de Bs. ${formatNumberVe(newRate)}/USD (${activePeriod.label})`,
+          unit_share_bs: updatedShareBs,
+          audit_comment: `Factura protegida en $${formatNumberVe(
+            fixedUsd
+          )} USD y actualizada a tasa de cierre de Bs. ${formatNumberVe(newRate)}/USD (${
+            activePeriod.label
+          })`,
         };
       });
       setExpenses(updatedExpensesList);
     }
 
-    // 2. Calcular nuevo total de gastos en USD del mes
-    const periodExp = updatedExpensesList.filter((e) => e.period_id === activePeriod.id);
+    // 2. Calcular total de gastos comunes en USD del mes (excluyendo anuladas y fondos separados)
+    const periodExp = updatedExpensesList.filter(
+      (e) =>
+        e.period_id === activePeriod.id &&
+        e.record_status !== 'anulado' &&
+        (!e.funding_source || e.funding_source === 'gasto_comun')
+    );
     const newTotalExpensesUsd = +periodExp.reduce((sum, item) => sum + item.amount, 0).toFixed(2);
 
-    // 3. Actualizar la tasa y total en el período
+    // 3. Actualizar la tasa de cierre y total en el período
     setPeriods((prev) =>
       prev.map((p) =>
         p.id === activePeriod.id
@@ -973,7 +1094,7 @@ export default function ResidenciasDanPortal() {
         newRate
       )}/USD.${
         recalculateExpensesWithClosingRate
-          ? ` Se dolarizaron las ${periodExp.length} facturas del mes. Nueva cuota por apto (÷ 72): $${formatNumberVe(
+          ? ` Se mantuvieron fijos los montos en $ USD de las ${periodExp.length} facturas y se actualizó su valor en Bolívares al cierre. Cuota por apto (÷ 72): $${formatNumberVe(
               cuotaPerAptoUsd
             )} USD (Bs. ${formatNumberVe(cuotaPerAptoBs)}).`
           : ''
@@ -1117,20 +1238,20 @@ export default function ResidenciasDanPortal() {
     setFormErrorMsg(null);
     setFeedbackMsg(null);
 
-    const amountBs = parseFloat(newAmountBs);
+    const parsedUsd = parseFloat(newAmountUsd);
+    const parsedBs = parseFloat(newAmountBs);
     const rateBs = parseFloat(newExchangeRateBs);
 
     if (
       !newSupplier ||
       !newRif ||
-      isNaN(amountBs) ||
-      amountBs <= 0 ||
+      ((isNaN(parsedUsd) || parsedUsd <= 0) && (isNaN(parsedBs) || parsedBs <= 0)) ||
       isNaN(rateBs) ||
       rateBs <= 0 ||
       !newInvoiceNumber
     ) {
       setFormErrorMsg(
-        'Por favor completa todos los datos del proveedor, el monto en Bolívares y la tasa del día.'
+        'Por favor completa los datos del proveedor, el monto de la factura ($ USD o Bs.) y la tasa del día.'
       );
       return;
     }
@@ -1191,11 +1312,30 @@ export default function ResidenciasDanPortal() {
       if (up.storagePath) evidenceStoragePath = up.storagePath;
     }
 
-    const amountUsd = +(amountBs / rateBs).toFixed(2);
+    // La factura se guarda fijando su valor en $ USD para evitar que se devalúe al cierre de mes
+    const amountUsd =
+      !isNaN(parsedUsd) && parsedUsd > 0
+        ? +parsedUsd.toFixed(2)
+        : +(parsedBs / rateBs).toFixed(2);
+    const originalAmountBs =
+      !isNaN(parsedBs) && parsedBs > 0
+        ? +parsedBs.toFixed(2)
+        : +(amountUsd * rateBs).toFixed(2);
+
+    const closingOrCurrentRate = activePeriod.exchange_rate_bs || rateBs;
+    const amountBsAtClosing = +(amountUsd * closingOrCurrentRate).toFixed(2);
+
     const matchedCat =
       INITIAL_CATEGORIES.find((c) => c.name === newCategory) || INITIAL_CATEGORIES[0];
     const shareUsd = +(amountUsd / CONDOMINIUM_DATA.total_units).toFixed(2);
-    const shareBs = +(amountBs / CONDOMINIUM_DATA.total_units).toFixed(2);
+    const shareBs = +(amountBsAtClosing / CONDOMINIUM_DATA.total_units).toFixed(2);
+
+    const sourceLabel =
+      newFundingSource === 'fondo_operativo'
+        ? 'Fondo Operativo (Monto Mensual Fijo)'
+        : newFundingSource === 'fondo_reserva'
+        ? 'Fondo de Reserva'
+        : 'Gastos Comunes del Mes (÷ 72)';
 
     const created: Expense = {
       id: `exp-junta-${Date.now()}`,
@@ -1206,8 +1346,10 @@ export default function ResidenciasDanPortal() {
       supplier_tax_id: newRif,
       description: newDescription || `Factura PDF adjunta (${invoiceStoragePath})`,
       amount: amountUsd,
-      exchange_rate_bs: rateBs,
-      amount_bs: +amountBs.toFixed(2),
+      exchange_rate_bs: closingOrCurrentRate,
+      amount_bs: amountBsAtClosing,
+      original_amount_bs: originalAmountBs,
+      original_exchange_rate_bs: rateBs,
       unit_share_usd: shareUsd,
       unit_share_bs: shareBs,
       expense_date: new Date().toISOString().slice(0, 10),
@@ -1219,12 +1361,15 @@ export default function ResidenciasDanPortal() {
       evidence_image_name: evidenceStoragePath || newEvidenceFileName || undefined,
       storage_path: invoiceStoragePath,
       evidence_storage_path: evidenceStoragePath,
+      funding_source: newFundingSource,
       record_status: 'activo',
       audit_status: 'verificado',
-      audit_comment: `Soporte estandarizado (${invoiceStoragePath}) — Monto: Bs. ${formatNumberVe(
-        amountBs
-      )} (Tasa: Bs. ${formatNumberVe(rateBs)}/USD)${
-        evidenceStoragePath ? ` • Evidencia comprimida WebP (${evidenceStoragePath})` : ''
+      audit_comment: `Cargado a: ${sourceLabel} • Factura guardada en $${formatNumberVe(
+        amountUsd
+      )} USD (Pago original: Bs. ${formatNumberVe(originalAmountBs)} a tasa Bs. ${formatNumberVe(
+        rateBs
+      )}/USD)${
+        evidenceStoragePath ? ` • Evidencia WebP (${evidenceStoragePath})` : ''
       }`,
       created_at: new Date().toISOString(),
     };
@@ -1266,6 +1411,7 @@ export default function ResidenciasDanPortal() {
     setNewRif('');
     setNewInvoiceNumber('');
     setNewControlNumber('');
+    setNewAmountUsd('');
     setNewAmountBs('');
     setNewDescription('');
     setNewFileName('');
@@ -1273,11 +1419,11 @@ export default function ResidenciasDanPortal() {
     setNewEvidenceFileName('');
     setNewEvidenceFileUrl(null);
     setFeedbackMsg(
-      `Factura ${created.invoice_number} guardada como "${invoiceStoragePath}" por Bs. ${formatNumberVe(
-        amountBs
-      )} ($${formatNumberVe(amountUsd)} USD). Cuota por apto (÷ 72): Bs. ${formatNumberVe(shareBs)} ($${formatNumberVe(
-        shareUsd
-      )} USD).`
+      `Factura ${created.invoice_number} guardada en $${formatNumberVe(
+        amountUsd
+      )} USD (protegida contra devaluación). Equivalente a tasa de cierre: Bs. ${formatNumberVe(
+        amountBsAtClosing
+      )}. Cuota por apto (÷ 72): $${formatNumberVe(shareUsd)} USD.`
     );
   };
 
@@ -1852,17 +1998,66 @@ export default function ResidenciasDanPortal() {
               <div className={`${lightGrayCardClass} p-4 flex items-center justify-between`}>
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 block">
-                    CUOTA PARTE POR APARTAMENTO (MONTO ÷ 72)
+                    CUOTA GASTOS COMUNES POR APTO (MONTO ÷ 72)
                   </span>
                   <div className="text-2xl font-black text-[#1d4ed8] mt-1 tabular-nums">
                     {formatMoney(sharePerApartmentUsd).primary}
                   </div>
                   <div className="text-[11px] font-semibold text-slate-500 mt-1">
-                    Equivalente: {formatMoney(sharePerApartmentUsd).secondary} por apto
+                    Equivalente: {formatMoney(sharePerApartmentUsd).secondary} • + Fijo Fondo Operativo (${formatNumberVe(operatingFixedPerUnitUsd)}/apto)
                   </div>
                 </div>
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1d4ed8] shadow-sm border border-indigo-100">
                   <Calculator className="h-5 w-5" />
+                </div>
+              </div>
+
+              {/* DISPONIBILIDAD EN CADA FONDO (FONDO OPERATIVO FIJO Y FONDO DE RESERVA) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  onClick={() => {
+                    setExpenseSourceFilter('fondo_operativo');
+                    setActiveTab('facturas_pdf');
+                  }}
+                  className={`${lightGrayCardClass} p-3.5 flex flex-col justify-between cursor-pointer active:scale-[0.99] transition border-teal-300/80`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-extrabold uppercase text-teal-800 leading-tight">
+                      FONDO OPERATIVO (FIJO)
+                    </span>
+                    <span className="rounded-md bg-teal-100 px-1.5 py-0.5 text-[9px] font-extrabold text-teal-900">
+                      ${formatNumberVe(operatingFixedPerUnitUsd)}/apto
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-teal-800 mt-2 tabular-nums">
+                    {formatMoney(operatingFundAvailableUsd).primary}
+                  </div>
+                  <div className="text-[10px] font-semibold text-slate-600 mt-1">
+                    Usado: -${formatNumberVe(totalOperatingSpentUsd)} ({operatingFundExpenses.length} fact.)
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setExpenseSourceFilter('fondo_reserva');
+                    setActiveTab('facturas_pdf');
+                  }}
+                  className={`${lightGrayCardClass} p-3.5 flex flex-col justify-between cursor-pointer active:scale-[0.99] transition border-amber-300/80`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-extrabold uppercase text-amber-900 leading-tight">
+                      FONDO DE RESERVA
+                    </span>
+                    <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-900">
+                      ${formatNumberVe(reserveFixedPerUnitUsd)}/apto
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-amber-800 mt-2 tabular-nums">
+                    {formatMoney(reserveFundAvailableUsd).primary}
+                  </div>
+                  <div className="text-[10px] font-semibold text-slate-600 mt-1">
+                    Usado: -${formatNumberVe(totalReserveSpentUsd)} ({reserveFundExpenses.length} fact.)
+                  </div>
                 </div>
               </div>
 
@@ -2438,23 +2633,24 @@ export default function ResidenciasDanPortal() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#1d4ed8]">
-                      GESTIÓN GLOBAL • 72 APARTAMENTOS
+                      GESTIÓN DE GASTOS Y FONDOS • 72 APARTAMENTOS
                     </span>
                     <h2 className="text-base font-black text-slate-900 mt-0.5">
-                      Relación de Gastos y Facturas — {activePeriod.label}
+                      Facturas y Movimientos de Fondos — {activePeriod.label}
                     </h2>
                     <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                      Cada gasto está respaldado por su factura PDF original y se divide en partes
-                      iguales (Monto ÷ 72)
+                      Separación transparente entre <strong>Gastos Comunes (÷ 72)</strong>,{' '}
+                      <strong>Fondo Operativo (Monto Mensual Fijo)</strong> y{' '}
+                      <strong>Fondo de Reserva</strong>, soportados con factura PDF y evidencia.
                     </p>
                   </div>
                 </div>
 
-                {/* Resumen de Totales en 2 Columnas */}
+                {/* Resumen de Gastos Comunes del Mes en 2 Columnas */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded-xl bg-white p-3 border border-slate-200/90">
                     <span className="text-[10px] font-extrabold uppercase text-slate-400 block">
-                      Gasto Total Torre A
+                      Gastos Comunes ({commonPeriodExpenses.length} fact.)
                     </span>
                     <strong className="text-base font-black font-mono text-slate-900 block mt-0.5">
                       ${formatNumberVe(totalPeriodExpensesUsd)} USD
@@ -2466,7 +2662,7 @@ export default function ResidenciasDanPortal() {
 
                   <div className="rounded-xl bg-indigo-50/90 p-3 border border-indigo-200">
                     <span className="text-[10px] font-extrabold uppercase text-[#1d4ed8] block">
-                      Cuota Apto (÷ 72)
+                      Cuota Común Apto (÷ 72)
                     </span>
                     <strong className="text-base font-black font-mono text-[#1d4ed8] block mt-0.5">
                       ${formatNumberVe(sharePerApartmentUsd)} USD
@@ -2474,6 +2670,193 @@ export default function ResidenciasDanPortal() {
                     <span className="text-[10px] font-mono font-bold text-slate-600">
                       Bs. {formatNumberVe(sharePerApartmentUsd * activePeriod.exchange_rate_bs)}
                     </span>
+                  </div>
+                </div>
+
+                {/* ESTADO Y DISPONIBILIDAD DE CADA FONDO (FONDO OPERATIVO FIJO Y FONDO DE RESERVA) */}
+                <div className="rounded-2xl bg-white p-3.5 border border-slate-200/90 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-800 block">
+                        ESTADO DISPONIBLE EN FONDOS Y MOVIMIENTOS
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Saldo Inicial + Cobro Fijo en Recibo − Facturas Ejecutadas
+                      </span>
+                    </div>
+                    {activeRole === 'junta' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTempFundsConfig({ ...fundsConfig });
+                          setShowEditFundsModal(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 text-[10px] font-extrabold text-[#1d4ed8] transition shrink-0"
+                      >
+                        <Pencil className="h-2.5 w-2.5" />
+                        Configurar Fondos
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {/* Tarjeta Fondo Operativo (Monto Mensual Fijo) */}
+                    <div className="rounded-xl bg-teal-50/70 border border-teal-200 p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-teal-700 text-white px-2 py-0.5 text-[9px] font-black uppercase">
+                          Fondo Operativo (Fijo Mensual)
+                        </span>
+                        <span className="text-[10px] font-mono font-extrabold text-teal-900">
+                          Cobro Fijo: ${formatNumberVe(fundsConfig.operating_fund_monthly_fixed_usd)} (${formatNumberVe(operatingFixedPerUnitUsd)}/apto)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px] font-mono">
+                        <div className="bg-white/90 rounded-lg p-1.5 border border-teal-100">
+                          <span className="text-[8px] font-sans font-bold uppercase text-slate-400 block">
+                            Saldo Inicial + Mes
+                          </span>
+                          <strong className="text-slate-800 font-extrabold">
+                            ${formatNumberVe(fundsConfig.operating_fund_initial_usd + fundsConfig.operating_fund_monthly_fixed_usd)}
+                          </strong>
+                        </div>
+                        <div className="bg-white/90 rounded-lg p-1.5 border border-teal-100">
+                          <span className="text-[8px] font-sans font-bold uppercase text-rose-600 block">
+                            Facturas ({operatingFundExpenses.length})
+                          </span>
+                          <strong className="text-rose-600 font-extrabold">
+                            -${formatNumberVe(totalOperatingSpentUsd)}
+                          </strong>
+                        </div>
+                        <div className="bg-teal-700 text-white rounded-lg p-1.5">
+                          <span className="text-[8px] font-sans font-bold uppercase text-teal-100 block">
+                            Disponible Hoy
+                          </span>
+                          <strong className="font-black">
+                            ${formatNumberVe(operatingFundAvailableUsd)}
+                          </strong>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-teal-900 pt-0.5">
+                        <span>Equivalente disponible a tasa BCV:</span>
+                        <strong>
+                          Bs. {formatNumberVe(operatingFundAvailableUsd * activePeriod.exchange_rate_bs)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Tarjeta Fondo de Reserva */}
+                    <div className="rounded-xl bg-amber-50/70 border border-amber-200 p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-600 text-white px-2 py-0.5 text-[9px] font-black uppercase">
+                          Fondo de Reserva (Patrimonio)
+                        </span>
+                        <span className="text-[10px] font-mono font-extrabold text-amber-950">
+                          Aporte Mes: ${formatNumberVe(fundsConfig.reserve_fund_monthly_usd)} (${formatNumberVe(reserveFixedPerUnitUsd)}/apto)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px] font-mono">
+                        <div className="bg-white/90 rounded-lg p-1.5 border border-amber-100">
+                          <span className="text-[8px] font-sans font-bold uppercase text-slate-400 block">
+                            Saldo Inicial + Mes
+                          </span>
+                          <strong className="text-slate-800 font-extrabold">
+                            ${formatNumberVe(fundsConfig.reserve_fund_initial_usd + fundsConfig.reserve_fund_monthly_usd)}
+                          </strong>
+                        </div>
+                        <div className="bg-white/90 rounded-lg p-1.5 border border-amber-100">
+                          <span className="text-[8px] font-sans font-bold uppercase text-rose-600 block">
+                            Facturas ({reserveFundExpenses.length})
+                          </span>
+                          <strong className="text-rose-600 font-extrabold">
+                            -${formatNumberVe(totalReserveSpentUsd)}
+                          </strong>
+                        </div>
+                        <div className="bg-amber-600 text-white rounded-lg p-1.5">
+                          <span className="text-[8px] font-sans font-bold uppercase text-amber-100 block">
+                            Disponible Hoy
+                          </span>
+                          <strong className="font-black">
+                            ${formatNumberVe(reserveFundAvailableUsd)}
+                          </strong>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-amber-950 pt-0.5">
+                        <span>Equivalente disponible a tasa BCV:</span>
+                        <strong>
+                          Bs. {formatNumberVe(reserveFundAvailableUsd * activePeriod.exchange_rate_bs)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pestañas / Filtros Rápidos por Apartado Contable (Todas, Gastos Comunes, Fondo Operativo, Fondo Reserva) */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                    FILTRAR FACTURAS POR APARTADO / FONDO:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSourceFilter('ALL')}
+                      className={`rounded-xl px-2.5 py-2 text-[11px] font-extrabold transition flex items-center justify-between ${
+                        expenseSourceFilter === 'ALL'
+                          ? 'bg-slate-900 text-white shadow-sm'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>Todas las Facturas</span>
+                      <span className="rounded-md bg-white/20 px-1.5 py-0.2 font-mono text-[10px]">
+                        {periodExpenses.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSourceFilter('gasto_comun')}
+                      className={`rounded-xl px-2.5 py-2 text-[11px] font-extrabold transition flex items-center justify-between ${
+                        expenseSourceFilter === 'gasto_comun'
+                          ? 'bg-[#1d4ed8] text-white shadow-sm'
+                          : 'bg-white text-[#1d4ed8] border border-indigo-200 hover:bg-indigo-50/50'
+                      }`}
+                    >
+                      <span>Gastos Comunes</span>
+                      <span className="rounded-md bg-indigo-100 text-[#1d4ed8] px-1.5 py-0.2 font-mono text-[10px]">
+                        {commonPeriodExpenses.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSourceFilter('fondo_operativo')}
+                      className={`rounded-xl px-2.5 py-2 text-[11px] font-extrabold transition flex items-center justify-between ${
+                        expenseSourceFilter === 'fondo_operativo'
+                          ? 'bg-teal-700 text-white shadow-sm'
+                          : 'bg-white text-teal-800 border border-teal-200 hover:bg-teal-50/50'
+                      }`}
+                    >
+                      <span>Fondo Operativo</span>
+                      <span className="rounded-md bg-teal-100 text-teal-900 px-1.5 py-0.2 font-mono text-[10px]">
+                        {operatingFundExpenses.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSourceFilter('fondo_reserva')}
+                      className={`rounded-xl px-2.5 py-2 text-[11px] font-extrabold transition flex items-center justify-between ${
+                        expenseSourceFilter === 'fondo_reserva'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'bg-white text-amber-800 border border-amber-200 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <span>Fondo de Reserva</span>
+                      <span className="rounded-md bg-amber-100 text-amber-900 px-1.5 py-0.2 font-mono text-[10px]">
+                        {reserveFundExpenses.length}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -2505,11 +2888,12 @@ export default function ResidenciasDanPortal() {
                       ))}
                     </select>
 
-                    {(searchQuery || categoryFilter !== 'ALL') && (
+                    {(searchQuery || categoryFilter !== 'ALL' || expenseSourceFilter !== 'ALL') && (
                       <button
                         onClick={() => {
                           setSearchQuery('');
                           setCategoryFilter('ALL');
+                          setExpenseSourceFilter('ALL');
                         }}
                         className="inline-flex items-center gap-1 rounded-xl bg-white border border-slate-200 px-3 py-2 text-[11px] font-extrabold text-[#1d4ed8] shrink-0"
                       >
@@ -2552,6 +2936,7 @@ export default function ResidenciasDanPortal() {
               <div className="space-y-3">
                 {filteredExpenses.map((exp) => {
                   const isAnnulled = exp.record_status === 'anulado';
+                  const expSource: ExpenseSource = exp.funding_source || 'gasto_comun';
                   const aptoUsd = exp.amount / CONDOMINIUM_DATA.total_units;
                   const aptoBs = exp.amount_bs / CONDOMINIUM_DATA.total_units;
                   return (
@@ -2559,7 +2944,13 @@ export default function ResidenciasDanPortal() {
                       key={exp.id}
                       onClick={() => setSelectedExpenseModal(exp)}
                       className={`${lightGrayCardClass} p-4 space-y-3 cursor-pointer active:scale-[0.99] transition ${
-                        isAnnulled ? 'opacity-75 border-rose-300 bg-rose-50/40' : ''
+                        isAnnulled
+                          ? 'opacity-75 border-rose-300 bg-rose-50/40'
+                          : expSource === 'fondo_operativo'
+                          ? 'border-teal-300/90'
+                          : expSource === 'fondo_reserva'
+                          ? 'border-amber-300/90'
+                          : ''
                       }`}
                     >
                       {isAnnulled && (
@@ -2580,7 +2971,7 @@ export default function ResidenciasDanPortal() {
 
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span
                               className={`font-mono text-xs font-black ${
                                 isAnnulled ? 'line-through text-rose-700' : 'text-[#1d4ed8]'
@@ -2591,6 +2982,19 @@ export default function ResidenciasDanPortal() {
                             <span className="text-[10px] font-bold text-slate-400">
                               • {exp.expense_date}
                             </span>
+                            {expSource === 'fondo_operativo' ? (
+                              <span className="rounded-md bg-teal-700 text-white px-2 py-0.5 text-[9px] font-black uppercase">
+                                Contra Fondo Operativo
+                              </span>
+                            ) : expSource === 'fondo_reserva' ? (
+                              <span className="rounded-md bg-amber-600 text-white px-2 py-0.5 text-[9px] font-black uppercase">
+                                Contra Fondo de Reserva
+                              </span>
+                            ) : (
+                              <span className="rounded-md bg-indigo-100 text-[#1d4ed8] border border-indigo-200 px-2 py-0.5 text-[9px] font-black uppercase">
+                                Gasto Común ÷ 72
+                              </span>
+                            )}
                           </div>
                           <h3
                             className={`text-sm font-black mt-0.5 ${
@@ -2643,36 +3047,77 @@ export default function ResidenciasDanPortal() {
                       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                         <div className="rounded-xl bg-white p-2.5 border border-slate-200/80">
                           <span className="text-[9px] font-sans font-extrabold uppercase text-slate-400 block">
-                            Monto Factura
+                            Monto Factura ($ Base)
                           </span>
                           <strong
                             className={`font-black block ${
                               isAnnulled ? 'line-through text-slate-400' : 'text-slate-900'
                             }`}
                           >
-                            Bs. {formatNumberVe(exp.amount_bs)}
+                            ${formatNumberVe(exp.amount)} USD
                           </strong>
-                          <span className="text-[10px] text-slate-500">
-                            ${formatNumberVe(exp.amount)} USD (Tasa{' '}
+                          <span className="text-[10px] text-slate-600 block">
+                            Bs. {formatNumberVe(exp.amount_bs)} (Tasa{' '}
                             {formatNumberVe(exp.exchange_rate_bs)})
                           </span>
+                          {exp.original_exchange_rate_bs &&
+                            exp.original_exchange_rate_bs !== exp.exchange_rate_bs && (
+                              <span className="text-[9px] text-emerald-700 font-semibold block mt-0.5">
+                                Pago orig.: Bs. {formatNumberVe(exp.original_amount_bs || 0)} (Tasa{' '}
+                                {formatNumberVe(exp.original_exchange_rate_bs)})
+                              </span>
+                            )}
                         </div>
 
-                        <div className="rounded-xl bg-indigo-50/90 p-2.5 border border-indigo-200">
-                          <span className="text-[9px] font-sans font-extrabold uppercase text-[#1d4ed8] block">
-                            Cuota Apto (÷ 72)
-                          </span>
-                          <strong
-                            className={`font-black block ${
-                              isAnnulled ? 'line-through text-slate-400' : 'text-[#1d4ed8]'
-                            }`}
-                          >
-                            ${formatNumberVe(isAnnulled ? 0 : aptoUsd)} USD
-                          </strong>
-                          <span className="text-[10px] text-slate-600">
-                            Bs. {formatNumberVe(isAnnulled ? 0 : aptoBs)}
-                          </span>
-                        </div>
+                        {expSource === 'fondo_operativo' ? (
+                          <div className="rounded-xl bg-teal-50/90 p-2.5 border border-teal-200">
+                            <span className="text-[9px] font-sans font-extrabold uppercase text-teal-800 block">
+                              Descuenta Fondo Operativo
+                            </span>
+                            <strong
+                              className={`font-black block ${
+                                isAnnulled ? 'line-through text-slate-400' : 'text-teal-800'
+                              }`}
+                            >
+                              -${formatNumberVe(isAnnulled ? 0 : exp.amount)} USD
+                            </strong>
+                            <span className="text-[10px] font-sans font-semibold text-teal-900">
+                              Cubierto con Monto Fijo Mensual
+                            </span>
+                          </div>
+                        ) : expSource === 'fondo_reserva' ? (
+                          <div className="rounded-xl bg-amber-50/90 p-2.5 border border-amber-200">
+                            <span className="text-[9px] font-sans font-extrabold uppercase text-amber-800 block">
+                              Descuenta Fondo Reserva
+                            </span>
+                            <strong
+                              className={`font-black block ${
+                                isAnnulled ? 'line-through text-slate-400' : 'text-amber-800'
+                              }`}
+                            >
+                              -${formatNumberVe(isAnnulled ? 0 : exp.amount)} USD
+                            </strong>
+                            <span className="text-[10px] font-sans font-semibold text-amber-900">
+                              Justificado contra Reserva
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-indigo-50/90 p-2.5 border border-indigo-200">
+                            <span className="text-[9px] font-sans font-extrabold uppercase text-[#1d4ed8] block">
+                              Cuota Apto (÷ 72)
+                            </span>
+                            <strong
+                              className={`font-black block ${
+                                isAnnulled ? 'line-through text-slate-400' : 'text-[#1d4ed8]'
+                              }`}
+                            >
+                              ${formatNumberVe(isAnnulled ? 0 : aptoUsd)} USD
+                            </strong>
+                            <span className="text-[10px] text-slate-600">
+                              Bs. {formatNumberVe(isAnnulled ? 0 : aptoBs)}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 pt-1">
@@ -3307,6 +3752,30 @@ export default function ResidenciasDanPortal() {
                     <button
                       type="button"
                       onClick={() => {
+                        setTempFundsConfig({ ...fundsConfig });
+                        setShowEditFundsModal(true);
+                      }}
+                      className="w-full rounded-xl bg-white hover:bg-teal-50/50 border border-slate-200 hover:border-teal-600 p-3 flex items-center justify-between gap-3 text-left shadow-sm transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                          <Layers className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-900">
+                            Configurar Fondo Operativo Fijo y Fondo de Reserva
+                          </div>
+                          <div className="text-[10px] font-semibold text-slate-500">
+                            Operativo disp.: ${formatNumberVe(operatingFundAvailableUsd)} • Reserva disp.: ${formatNumberVe(reserveFundAvailableUsd)}
+                          </div>
+                        </div>
+                      </div>
+                      <Pencil className="h-4 w-4 text-teal-700 shrink-0" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
                         setTempBankDetails({ ...bankDetails });
                         setShowEditBankModal(true);
                       }}
@@ -3564,18 +4033,17 @@ export default function ResidenciasDanPortal() {
                 </div>
               )}
 
-              {/* FORMULARIO 1: REGISTRAR FACTURA EN BOLÍVARES + TASA DEL DÍA + PDF */}
+              {/* FORMULARIO 1: REGISTRAR FACTURA GUARDADA EN DÓLARES ($ USD) + ACTUALIZABLE AL CIERRE */}
               <div className={`${lightGrayCardClass} p-4 space-y-3.5`}>
                 <div className="border-b border-slate-200 pb-2.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#1d4ed8]">
-                    REGISTRO INDIVIDUAL DE GASTOS ({activePeriod.label.toUpperCase()})
+                    REGISTRO PROTEGIDO CONTRA DEVALUACIÓN ({activePeriod.label.toUpperCase()})
                   </span>
                   <h3 className="text-sm font-black text-slate-900 mt-0.5">
-                    Registrar Factura en Bolívares (Bs.) y PDF
+                    Registrar Factura Guardada en Dólares ($ USD) y PDF
                   </h3>
                   <p className="text-[11px] text-slate-600 font-medium">
-                    Ingresa el monto en Bolívares, la tasa del día y adjunta la factura PDF del
-                    proveedor
+                    La factura se guarda en <strong>$ USD</strong> (puedes escribir el monto en $ o en Bs. a la tasa del día) y al final del mes su saldo en Bs. se actualiza con la tasa de cierre.
                   </p>
                 </div>
 
@@ -3640,68 +4108,188 @@ export default function ResidenciasDanPortal() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  {/* Selector de Apartado / Fondo (Gastos Comunes vs Fondo Operativo Fijo vs Fondo Reserva) */}
+                  <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-2">
+                    <label className="font-extrabold text-slate-800 block">
+                      Apartado / Fondo contra el que se carga la Factura *
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewFundingSource('gasto_comun')}
+                        className={`rounded-xl px-3 py-2 text-left text-[11px] font-bold border transition flex items-center justify-between ${
+                          newFundingSource === 'gasto_comun'
+                            ? 'bg-[#1d4ed8] text-white border-[#1d4ed8] shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-black block">1. Gastos Comunes del Mes (÷ 72)</span>
+                          <span
+                            className={`text-[10px] ${
+                              newFundingSource === 'gasto_comun' ? 'text-blue-100' : 'text-slate-500'
+                            }`}
+                          >
+                            Se divide entre los 72 apartamentos en la relación mensual
+                          </span>
+                        </div>
+                        {newFundingSource === 'gasto_comun' && <Check className="h-4 w-4 shrink-0" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewFundingSource('fondo_operativo')}
+                        className={`rounded-xl px-3 py-2 text-left text-[11px] font-bold border transition flex items-center justify-between ${
+                          newFundingSource === 'fondo_operativo'
+                            ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50/40'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-black block">
+                            2. Contra Fondo Operativo (Monto Mensual Fijo)
+                          </span>
+                          <span
+                            className={`text-[10px] ${
+                              newFundingSource === 'fondo_operativo'
+                                ? 'text-teal-100'
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            Justifica movimiento y descuenta del Fondo Operativo (Disp.: $
+                            {formatNumberVe(operatingFundAvailableUsd)})
+                          </span>
+                        </div>
+                        {newFundingSource === 'fondo_operativo' && (
+                          <Check className="h-4 w-4 shrink-0" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewFundingSource('fondo_reserva')}
+                        className={`rounded-xl px-3 py-2 text-left text-[11px] font-bold border transition flex items-center justify-between ${
+                          newFundingSource === 'fondo_reserva'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50/40'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-black block">
+                            3. Contra Fondo de Reserva (Contingencias / Obras)
+                          </span>
+                          <span
+                            className={`text-[10px] ${
+                              newFundingSource === 'fondo_reserva'
+                                ? 'text-amber-100'
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            Justifica movimiento y descuenta del Fondo de Reserva (Disp.: $
+                            {formatNumberVe(reserveFundAvailableUsd)})
+                          </span>
+                        </div>
+                        {newFundingSource === 'fondo_reserva' && (
+                          <Check className="h-4 w-4 shrink-0" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="font-extrabold text-slate-700 block mb-1">
-                        Monto en Bolívares (Bs.) *
+                      <label className="font-extrabold text-[#1d4ed8] block mb-1">
+                        Monto ($ USD) *
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         required
-                        value={newAmountBs}
-                        onChange={(e) => setNewAmountBs(e.target.value)}
-                        placeholder="19746,00"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono font-bold text-slate-900 focus:border-[#1d4ed8] focus:outline-none"
+                        value={newAmountUsd}
+                        onChange={(e) => {
+                          const valUsd = e.target.value;
+                          setNewAmountUsd(valUsd);
+                          const numUsd = parseFloat(valUsd);
+                          const numRate = parseFloat(newExchangeRateBs);
+                          if (!isNaN(numUsd) && numUsd >= 0 && !isNaN(numRate) && numRate > 0) {
+                            setNewAmountBs((numUsd * numRate).toFixed(2));
+                          } else if (!valUsd) {
+                            setNewAmountBs('');
+                          }
+                        }}
+                        placeholder="360,00"
+                        className="w-full rounded-xl border border-indigo-300 bg-indigo-50/40 px-2.5 py-2.5 font-mono font-black text-[#1d4ed8] focus:border-[#1d4ed8] focus:outline-none"
                       />
                     </div>
                     <div>
                       <label className="font-extrabold text-slate-700 block mb-1">
-                        Tasa del Día (Bs./USD) *
+                        Tasa Día (Bs/$) *
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         required
                         value={newExchangeRateBs}
-                        onChange={(e) => setNewExchangeRateBs(e.target.value)}
+                        onChange={(e) => {
+                          const valRate = e.target.value;
+                          setNewExchangeRateBs(valRate);
+                          const numRate = parseFloat(valRate);
+                          const numBs = parseFloat(newAmountBs);
+                          if (!isNaN(numBs) && numBs > 0 && !isNaN(numRate) && numRate > 0) {
+                            setNewAmountUsd((numBs / numRate).toFixed(2));
+                          }
+                        }}
                         placeholder="54,85"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono font-bold text-emerald-700 focus:border-[#1d4ed8] focus:outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 font-mono font-bold text-emerald-700 focus:border-[#1d4ed8] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-extrabold text-slate-700 block mb-1">
+                        Pagado (Bs.)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newAmountBs}
+                        onChange={(e) => {
+                          const valBs = e.target.value;
+                          setNewAmountBs(valBs);
+                          const numBs = parseFloat(valBs);
+                          const numRate = parseFloat(newExchangeRateBs);
+                          if (!isNaN(numBs) && numBs >= 0 && !isNaN(numRate) && numRate > 0) {
+                            setNewAmountUsd((numBs / numRate).toFixed(2));
+                          } else if (!valBs) {
+                            setNewAmountUsd('');
+                          }
+                        }}
+                        placeholder="19746,00"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 font-mono font-bold text-slate-900 focus:border-[#1d4ed8] focus:outline-none"
                       />
                     </div>
                   </div>
 
-                  {newAmountBs &&
-                    !isNaN(parseFloat(newAmountBs)) &&
-                    parseFloat(newAmountBs) > 0 &&
-                    newExchangeRateBs &&
-                    !isNaN(parseFloat(newExchangeRateBs)) &&
-                    parseFloat(newExchangeRateBs) > 0 && (
+                  {newAmountUsd &&
+                    !isNaN(parseFloat(newAmountUsd)) &&
+                    parseFloat(newAmountUsd) > 0 && (
                       <div className="rounded-xl bg-indigo-50/90 p-3 border border-indigo-200 font-mono text-[11px] text-indigo-950 space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="font-sans font-bold text-slate-700">
-                            Equivalente USD:
+                            Monto Guardado Fijo ($ USD):
                           </span>
-                          <strong className="font-black text-slate-900">
-                            $
-                            {formatNumberVe(
-                              parseFloat(newAmountBs) / parseFloat(newExchangeRateBs)
-                            )}{' '}
-                            USD
+                          <strong className="font-black text-[#1d4ed8]">
+                            ${formatNumberVe(parseFloat(newAmountUsd))} USD (No se devalúa)
                           </strong>
                         </div>
                         <div className="flex justify-between items-center pt-1 border-t border-indigo-200/70">
                           <span className="font-sans font-bold text-slate-700">
-                            Cuota Apto (÷ 72):
+                            Cuota Apto Protegida (÷ 72):
                           </span>
-                          <strong className="font-black text-[#1d4ed8]">
-                            Bs. {formatNumberVe(parseFloat(newAmountBs) / 72)} ($
+                          <strong className="font-black text-emerald-700">
+                            ${formatNumberVe(parseFloat(newAmountUsd) / 72)} USD (Bs.{' '}
                             {formatNumberVe(
-                              parseFloat(newAmountBs) /
-                                parseFloat(newExchangeRateBs) /
-                                72
-                            )}
-                            )
+                              (parseFloat(newAmountUsd) / 72) * activePeriod.exchange_rate_bs
+                            )}{' '}
+                            al cierre)
                           </strong>
                         </div>
                       </div>
@@ -4771,7 +5359,7 @@ export default function ResidenciasDanPortal() {
                   </span>
                 </div>
 
-                {/* Opción de recalcular y dolarizar facturas del mes */}
+                {/* Opción de actualizar Bolívares al corte manteniendo el monto fijo en $ USD */}
                 <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200 space-y-2.5">
                   <label className="flex items-start gap-2.5 cursor-pointer">
                     <input
@@ -4782,10 +5370,10 @@ export default function ResidenciasDanPortal() {
                     />
                     <div>
                       <span className="text-xs font-extrabold text-slate-900 block">
-                        Dolarizar todas las facturas en Bolívares al corte
+                        Actualizar saldo en Bolívares (Bs.) con la tasa de cierre (Protección en $ USD)
                       </span>
                       <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                        Mantiene intacto el monto original en Bolívares (Bs.) de cada factura del proveedor y actualiza su saldo en dólares ($ USD) con esta tasa de cierre.
+                        Mantiene intacto el monto guardado en <strong>Dólares ($ USD)</strong> de cada factura para evitar que los gastos de principio de mes se devalúen, y actualiza su equivalente en Bolívares multiplicando por esta tasa de cierre.
                       </p>
                     </div>
                   </label>
@@ -4795,39 +5383,42 @@ export default function ResidenciasDanPortal() {
                     parseFloat(tempClosingRateBs) > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-200 font-mono text-[11px] text-slate-800 space-y-1.5">
                         <div className="flex justify-between">
-                          <span className="font-sans text-slate-600">Facturas en Bolívares:</span>
-                          <strong>{periodExpenses.length} facturas</strong>
+                          <span className="font-sans text-slate-600">Facturas activas del mes:</span>
+                          <strong>{activePeriodExpenses.length} facturas</strong>
                         </div>
                         <div className="flex justify-between">
-                          <span className="font-sans text-slate-600">Total acumulado en Bs.:</span>
-                          <strong>
-                            Bs.{' '}
+                          <span className="font-sans text-slate-600">Total protegido en Dólares ($ USD):</span>
+                          <strong className="text-[#1d4ed8]">
+                            $
                             {formatNumberVe(
-                              periodExpenses.reduce((acc, e) => acc + e.amount_bs, 0)
-                            )}
+                              activePeriodExpenses.reduce((acc, e) => acc + e.amount, 0)
+                            )}{' '}
+                            USD
                           </strong>
                         </div>
                         <div className="flex justify-between text-emerald-700 font-bold pt-1 border-t border-slate-200/60">
-                          <span className="font-sans">Total Dolarizado ($ USD):</span>
+                          <span className="font-sans">Nuevo Total en Bs. (a Tasa de Cierre):</span>
                           <strong>
-                            $
+                            Bs.{' '}
                             {formatNumberVe(
-                              periodExpenses.reduce((acc, e) => acc + e.amount_bs, 0) /
+                              activePeriodExpenses.reduce((acc, e) => acc + e.amount, 0) *
                                 parseFloat(tempClosingRateBs)
-                            )}{' '}
-                            USD
+                            )}
                           </strong>
                         </div>
                         <div className="flex justify-between text-[#1d4ed8] font-bold">
-                          <span className="font-sans">Nueva Cuota Apto (÷ 72):</span>
+                          <span className="font-sans">Cuota Apto Protegida (÷ 72):</span>
                           <strong>
                             $
                             {formatNumberVe(
-                              periodExpenses.reduce((acc, e) => acc + e.amount_bs, 0) /
-                                parseFloat(tempClosingRateBs) /
-                                72
+                              activePeriodExpenses.reduce((acc, e) => acc + e.amount, 0) / 72
                             )}{' '}
-                            USD
+                            USD (Bs.{' '}
+                            {formatNumberVe(
+                              (activePeriodExpenses.reduce((acc, e) => acc + e.amount, 0) / 72) *
+                                parseFloat(tempClosingRateBs)
+                            )}
+                            )
                           </strong>
                         </div>
                       </div>
@@ -5432,6 +6023,161 @@ export default function ResidenciasDanPortal() {
                   >
                     <Ban className="h-4 w-4" />
                     Confirmar Anulación
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 10: CONFIGURACIÓN DE FONDO OPERATIVO FIJO Y FONDO DE RESERVA */}
+        {showEditFundsModal && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#090d1a]/80 p-0 sm:p-3 backdrop-blur-sm">
+            <div className="relative w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700 border border-teal-200 shadow-xs">
+                    <Layers className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">
+                      Configurar Fondos del Condominio
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Fondo Operativo (Monto Fijo) y Fondo de Reserva
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditFundsModal(false)}
+                  className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveFundsConfig} className="space-y-3.5 text-xs">
+                {/* Sección 1: Fondo Operativo */}
+                <div className="rounded-2xl bg-teal-50/70 border border-teal-200 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-md bg-teal-700 text-white px-2 py-0.5 text-[10px] font-black uppercase">
+                      1. Fondo Operativo (Monto Fijo)
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-teal-900">
+                      ${formatNumberVe(tempFundsConfig.operating_fund_monthly_fixed_usd / 72)} / apto
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Monto fijo mensual que se cobra en el recibo para cubrir suministros y gastos operativos menores, justificados con sus facturas y fotos.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-700 block mb-1">
+                        Saldo Inicial / Anterior ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={tempFundsConfig.operating_fund_initial_usd}
+                        onChange={(e) =>
+                          setTempFundsConfig((prev) => ({
+                            ...prev,
+                            operating_fund_initial_usd: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-teal-300 bg-white px-2.5 py-2 font-mono font-bold text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-teal-900 block mb-1">
+                        Cobro Fijo Mensual ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={tempFundsConfig.operating_fund_monthly_fixed_usd}
+                        onChange={(e) =>
+                          setTempFundsConfig((prev) => ({
+                            ...prev,
+                            operating_fund_monthly_fixed_usd: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-teal-300 bg-white px-2.5 py-2 font-mono font-black text-teal-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sección 2: Fondo de Reserva */}
+                <div className="rounded-2xl bg-amber-50/70 border border-amber-200 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-md bg-amber-600 text-white px-2 py-0.5 text-[10px] font-black uppercase">
+                      2. Fondo de Reserva (Patrimonio)
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-amber-950">
+                      ${formatNumberVe(tempFundsConfig.reserve_fund_monthly_usd / 72)} / apto
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Fondo patrimonial para contingencias mayores o reparaciones extraordinarias de ascensores, bombas e infraestructura.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-700 block mb-1">
+                        Saldo Acumulado ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={tempFundsConfig.reserve_fund_initial_usd}
+                        onChange={(e) =>
+                          setTempFundsConfig((prev) => ({
+                            ...prev,
+                            reserve_fund_initial_usd: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-amber-300 bg-white px-2.5 py-2 font-mono font-bold text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-amber-900 block mb-1">
+                        Aporte Mensual ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={tempFundsConfig.reserve_fund_monthly_usd}
+                        onChange={(e) =>
+                          setTempFundsConfig((prev) => ({
+                            ...prev,
+                            reserve_fund_monthly_usd: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-amber-300 bg-white px-2.5 py-2 font-mono font-black text-amber-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditFundsModal(false)}
+                    className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-100 py-2.5 text-xs font-bold text-slate-700 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1d4ed8] hover:bg-blue-700 py-2.5 text-xs font-extrabold text-white shadow-md transition"
+                  >
+                    <Check className="h-4 w-4" />
+                    Guardar Fondos
                   </button>
                 </div>
               </form>

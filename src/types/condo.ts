@@ -8,6 +8,15 @@ export type AuditStatus = 'verificado' | 'pendiente' | 'observado';
 
 export type RecordStatus = 'activo' | 'anulado';
 
+export type ExpenseSource = 'gasto_comun' | 'fondo_operativo' | 'fondo_reserva';
+
+export interface CondoFundsConfig {
+  operating_fund_initial_usd: number; // Saldo previo disponible en el Fondo Operativo
+  operating_fund_monthly_fixed_usd: number; // Monto mensual fijo que se cobra en el recibo para el Fondo Operativo (Total Torre A)
+  reserve_fund_initial_usd: number; // Saldo previo acumulado en el Fondo de Reserva
+  reserve_fund_monthly_usd: number; // Aporte mensual que ingresa al Fondo de Reserva (Total Torre A)
+}
+
 export type ProjectStatus = 'finalizado' | 'en_ejecucion' | 'planificado';
 
 export interface CondoProject {
@@ -79,11 +88,13 @@ export interface Expense {
   supplier_name: string;
   supplier_tax_id: string; // RIF
   description: string;
-  amount: number; // Monto total USD ($)
-  exchange_rate_bs: number;
-  amount_bs: number; // Monto total Bs.
-  unit_share_usd: number; // Monto / 72 apartamentos
-  unit_share_bs: number; // (Monto / 72) * tasa
+  amount: number; // Monto total USD ($) — Moneda base protegida contra devaluación
+  exchange_rate_bs: number; // Tasa vigente / Tasa de cierre aplicada
+  amount_bs: number; // Monto total Bs. actualizado a la tasa de cierre
+  original_amount_bs?: number; // Monto en Bs. pagado originalmente el día de la factura (auditoría)
+  original_exchange_rate_bs?: number; // Tasa BCV del día original en que se emitió/pagó la factura
+  unit_share_usd: number; // Monto / 72 apartamentos ($)
+  unit_share_bs: number; // (Monto / 72) * tasa de cierre (Bs.)
   expense_date: string; // YYYY-MM-DD
   invoice_url: string;
   invoice_number: string;
@@ -92,6 +103,7 @@ export interface Expense {
   evidence_image_name?: string;
   storage_path?: string; // Ruta cronológica ej: 2026/10/factura_hidrocapital_172988.pdf
   evidence_storage_path?: string; // Ruta cronológica ej: 2026/10/evidencia_hidrocapital_172988.webp
+  funding_source?: ExpenseSource; // 'gasto_comun' | 'fondo_operativo' | 'fondo_reserva'
   record_status?: RecordStatus; // Inmutabilidad contable: 'activo' | 'anulado'
   annulled_reason?: string;
   annulled_at?: string;
