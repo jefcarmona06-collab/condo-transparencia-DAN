@@ -250,32 +250,33 @@ export default function ResidenciasDanPortal() {
 
   // Estados para Tasa Oficial de Cierre del Mes / Corte (Editable por la Junta)
   const [showEditRateModal, setShowEditRateModal] = useState<boolean>(false);
-  const [tempClosingRateBs, setTempClosingRateBs] = useState<string>('54.85');
+  const [tempClosingRateBs, setTempClosingRateBs] = useState<string>('897.5383');
   const [recalculateExpensesWithClosingRate, setRecalculateExpensesWithClosingRate] = useState<boolean>(true);
+  const [over10Copied, setOver10Copied] = useState<boolean>(false);
 
   // Saldo Bancario Editable por la Junta
   const [bankBalanceUsd, setBankBalanceUsd] = useState<number>(CONDOMINIUM_DATA.bank_balance_usd);
   const [showEditBalanceModal, setShowEditBalanceModal] = useState<boolean>(false);
   const [tempBankBalanceUsd, setTempBankBalanceUsd] = useState<string>(
-    CONDOMINIUM_DATA.bank_balance_usd.toString()
+    CONDOMINIUM_DATA.bank_balance_usd.toFixed(2)
   );
 
-  // Datos Bancarios Editables por la Junta
+  // Datos Bancarios Editables por la Junta (Bancaribe según estado de cuenta al 06-11-2026)
   const [bankDetails, setBankDetails] = useState<BankAccountDetails>({
-    bankName: 'Banco Mercantil',
-    bankCode: '0105',
+    bankName: 'Bancaribe',
+    bankCode: '0114',
     accountType: 'Cuenta Corriente',
-    accountNumber: '0105-0021-34-1021456789',
-    holderName: 'Condominio Residencias DAN Torre A',
+    accountNumber: '0114-0150-32-1500294955',
+    holderName: 'Residencias Dan Torre A',
     taxId: CONDOMINIUM_DATA.tax_id,
   });
   const [showEditBankModal, setShowEditBankModal] = useState<boolean>(false);
   const [tempBankDetails, setTempBankDetails] = useState<BankAccountDetails>({
-    bankName: 'Banco Mercantil',
-    bankCode: '0105',
+    bankName: 'Bancaribe',
+    bankCode: '0114',
     accountType: 'Cuenta Corriente',
-    accountNumber: '0105-0021-34-1021456789',
-    holderName: 'Condominio Residencias DAN Torre A',
+    accountNumber: '0114-0150-32-1500294955',
+    holderName: 'Residencias Dan Torre A',
     taxId: CONDOMINIUM_DATA.tax_id,
   });
 
@@ -341,7 +342,7 @@ export default function ResidenciasDanPortal() {
   const [newControlNumber, setNewControlNumber] = useState('');
   const [newAmountUsd, setNewAmountUsd] = useState('');
   const [newAmountBs, setNewAmountBs] = useState('');
-  const [newExchangeRateBs, setNewExchangeRateBs] = useState('54.85');
+  const [newExchangeRateBs, setNewExchangeRateBs] = useState('897.5383');
   const [newDescription, setNewDescription] = useState('');
   const [newFileName, setNewFileName] = useState('');
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
@@ -366,7 +367,7 @@ export default function ResidenciasDanPortal() {
   const [newProjSupplier, setNewProjSupplier] = useState('');
   const [newProjInvoice, setNewProjInvoice] = useState('');
   const [newProjAmountBs, setNewProjAmountBs] = useState('');
-  const [newProjRateBs, setNewProjRateBs] = useState('54.85');
+  const [newProjRateBs, setNewProjRateBs] = useState('897.5383');
   const [newProjDate, setNewProjDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [newProjStatus, setNewProjStatus] = useState<ProjectStatus>('finalizado');
   const [newProjDescription, setNewProjDescription] = useState('');
@@ -383,19 +384,19 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const savedExpenses = localStorage.getItem('dan_v1_expenses');
+      const savedExpenses = localStorage.getItem('dan_v2_expenses');
       if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
 
-      const savedPeriods = localStorage.getItem('dan_v2_periods');
+      const savedPeriods = localStorage.getItem('dan_v3_periods');
       if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
 
       const savedReceivables = localStorage.getItem('dan_v3_receivables');
       if (savedReceivables) setReceivablesList(JSON.parse(savedReceivables));
 
-      const savedBalance = localStorage.getItem('dan_v1_bank_balance');
+      const savedBalance = localStorage.getItem('dan_v2_bank_balance');
       if (savedBalance) setBankBalanceUsd(parseFloat(savedBalance));
 
-      const savedBankDetails = localStorage.getItem('dan_v1_bank_details');
+      const savedBankDetails = localStorage.getItem('dan_v2_bank_details');
       if (savedBankDetails) setBankDetails(JSON.parse(savedBankDetails));
 
       const savedBoard = localStorage.getItem('dan_v1_board_members');
@@ -404,7 +405,7 @@ export default function ResidenciasDanPortal() {
       const savedProjects = localStorage.getItem('dan_v1_projects');
       if (savedProjects) setProjects(JSON.parse(savedProjects));
 
-      const savedFundsConfig = localStorage.getItem('dan_v1_funds_config');
+      const savedFundsConfig = localStorage.getItem('dan_v2_funds_config');
       if (savedFundsConfig) setFundsConfig(JSON.parse(savedFundsConfig));
     } catch (err) {
       console.warn('Error hidratando localStorage:', err);
@@ -417,7 +418,7 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
-      localStorage.setItem('dan_v1_expenses', JSON.stringify(expenses));
+      localStorage.setItem('dan_v2_expenses', JSON.stringify(expenses));
     } catch (e) {
       console.warn('Cuota de localStorage alcanzada en expenses:', e);
     }
@@ -426,13 +427,13 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
-      localStorage.setItem('dan_v2_periods', JSON.stringify(periods));
+      localStorage.setItem('dan_v3_periods', JSON.stringify(periods));
       localStorage.setItem('dan_v3_receivables', JSON.stringify(receivablesList));
-      localStorage.setItem('dan_v1_bank_balance', bankBalanceUsd.toString());
-      localStorage.setItem('dan_v1_bank_details', JSON.stringify(bankDetails));
+      localStorage.setItem('dan_v2_bank_balance', bankBalanceUsd.toString());
+      localStorage.setItem('dan_v2_bank_details', JSON.stringify(bankDetails));
       localStorage.setItem('dan_v1_board_members', JSON.stringify(boardMembers));
       localStorage.setItem('dan_v1_projects', JSON.stringify(projects));
-      localStorage.setItem('dan_v1_funds_config', JSON.stringify(fundsConfig));
+      localStorage.setItem('dan_v2_funds_config', JSON.stringify(fundsConfig));
     } catch (e) {
       console.warn('Error guardando estado en localStorage:', e);
     }
@@ -667,6 +668,20 @@ export default function ResidenciasDanPortal() {
   const debtOnlyList = useMemo(
     () => receivablesList.filter((item) => item.pending_months > 0),
     [receivablesList]
+  );
+
+  // Resumen exclusivo para la Junta: Apartamentos con más de 10 recibos pendientes (> 10 recibos)
+  const criticalDebtorsOver10 = useMemo(
+    () =>
+      receivablesList
+        .filter((item) => item.pending_months > 10)
+        .sort((a, b) => b.pending_months - a.pending_months),
+    [receivablesList]
+  );
+
+  const criticalDebtOver10TotalUsd = useMemo(
+    () => +criticalDebtorsOver10.reduce((sum, item) => sum + item.amount_usd, 0).toFixed(2),
+    [criticalDebtorsOver10]
   );
 
   const filteredReceivables = useMemo(() => {
@@ -2338,6 +2353,145 @@ export default function ResidenciasDanPortal() {
                       Resumen PDF
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* RESUMEN EXCLUSIVO JUNTA: APARTAMENTOS CON MÁS DE 10 RECIBOS PENDIENTES */}
+              {activeRole === 'junta' && (
+                <div className="rounded-2xl bg-gradient-to-br from-rose-50 via-white to-rose-50/60 border-2 border-rose-300 p-4 space-y-3 shadow-md">
+                  <div className="flex items-start justify-between gap-2 border-b border-rose-200/80 pb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm">
+                        <AlertTriangle className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 block">
+                          CONTROL INTERNO JUNTA DIRECTIVA
+                        </span>
+                        <h3 className="text-xs font-black text-slate-900">
+                          Resumen de Apartamentos con +10 Recibos Pendientes
+                        </h3>
+                      </div>
+                    </div>
+                    <span className="rounded-lg bg-rose-600 text-white px-2 py-1 text-[10px] font-mono font-black shrink-0">
+                      {criticalDebtorsOver10.length} Aptos
+                    </span>
+                  </div>
+
+                  {/* Totales del grupo > 10 recibos */}
+                  <div className="grid grid-cols-3 gap-2 text-center font-mono bg-white p-2.5 rounded-xl border border-rose-200 shadow-xs">
+                    <div>
+                      <span className="text-[9px] font-sans font-extrabold uppercase text-slate-400 block">
+                        Casos (+10 Rec)
+                      </span>
+                      <strong className="text-rose-700 font-black text-sm">
+                        {criticalDebtorsOver10.length} de {debtOnlyList.length}
+                      </strong>
+                    </div>
+                    <div className="border-x border-rose-100">
+                      <span className="text-[9px] font-sans font-extrabold uppercase text-slate-400 block">
+                        Subtotal ($ USD)
+                      </span>
+                      <strong className="text-rose-700 font-black text-xs">
+                        ${formatNumberVe(criticalDebtOver10TotalUsd)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-sans font-extrabold uppercase text-slate-400 block">
+                        % Deuda Total
+                      </span>
+                      <strong className="text-slate-900 font-black text-xs">
+                        {activePeriod.accounts_receivable_usd > 0
+                          ? formatNumberVe(
+                              (criticalDebtOver10TotalUsd / activePeriod.accounts_receivable_usd) *
+                                100,
+                              1
+                            )
+                          : '0,0'}
+                        %
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Equivalente en Bs a tasa de cierre */}
+                  <div className="rounded-xl bg-rose-100/70 border border-rose-200 px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-rose-950">
+                    <span className="font-sans font-bold">Equivalente en Bolívares (Tasa {formatNumberVe(activePeriod.exchange_rate_bs)}):</span>
+                    <strong className="font-black">
+                      Bs. {formatNumberVe(criticalDebtOver10TotalUsd * activePeriod.exchange_rate_bs)}
+                    </strong>
+                  </div>
+
+                  {/* Listado detallado ordenado de mayor a menor cantidad de recibos */}
+                  <div className="space-y-1.5">
+                    {criticalDebtorsOver10.map((item, idx) => (
+                      <div
+                        key={item.unit}
+                        className="rounded-xl bg-white px-3 py-2 border border-rose-200/90 flex items-center justify-between gap-2 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-rose-100 text-rose-800 font-mono text-[10px] font-black">
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <strong className="font-black text-slate-900">{item.unit}</strong>
+                              <span className="text-[10px] font-bold text-slate-400">
+                                ({item.floor})
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-extrabold text-rose-700 block">
+                              {item.pending_months} recibos pendientes
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right font-mono">
+                          <strong className="text-xs font-black text-rose-700 block">
+                            ${formatNumberVe(item.amount_usd)} USD
+                          </strong>
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            Bs. {formatNumberVe(item.amount_usd * activePeriod.exchange_rate_bs)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Botón para copiar relación de +10 recibos */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = [
+                        `*${CONDOMINIUM_DATA.name.toUpperCase()} — JUNTA DE CONDOMINIO*`,
+                        `*RESUMEN DE APARTAMENTOS CON MÁS DE 10 RECIBOS PENDIENTES*`,
+                        `Corte: ${activePeriod.label} • Tasa BCV: Bs. ${formatNumberVe(activePeriod.exchange_rate_bs, 4)}`,
+                        `----------------------------------`,
+                        ...criticalDebtorsOver10.map(
+                          (u, i) =>
+                            `${i + 1}. *Apto. ${u.unit}:* ${u.pending_months} recibos — *$${formatNumberVe(u.amount_usd)} USD* (Bs. ${formatNumberVe(u.amount_usd * activePeriod.exchange_rate_bs)})`
+                        ),
+                        `----------------------------------`,
+                        `• *Total Casos (+10 recibos):* ${criticalDebtorsOver10.length} apartamentos`,
+                        `• *Subtotal Deuda (+10 recibos):* $${formatNumberVe(criticalDebtOver10TotalUsd)} USD (Bs. ${formatNumberVe(criticalDebtOver10TotalUsd * activePeriod.exchange_rate_bs)})`,
+                      ].join('\n');
+                      navigator.clipboard.writeText(text);
+                      setOver10Copied(true);
+                      setTimeout(() => setOver10Copied(false), 3000);
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 px-3 py-2 text-[11px] font-extrabold text-white shadow-sm transition"
+                  >
+                    {over10Copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        Resumen (+10 Recibos) Copiado al Portapapeles
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        Copiar Resumen de +10 Recibos (Solo Junta)
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 
