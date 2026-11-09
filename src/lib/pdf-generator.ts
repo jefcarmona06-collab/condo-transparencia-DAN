@@ -626,17 +626,18 @@ export function downloadAccountsReceivableWhatsappPdf(
   condominium: CondominiumInfo,
   period: MonthlyPeriod,
   debtGroups: DebtBracketSummary[],
-  _receivables: ReceivableAccountItem[]
+  receivables: ReceivableAccountItem[]
 ) {
   const pageWidth = 595.28;
+  const pageHeight = 841.89;
   const marginX = 32;
   const contentW = pageWidth - marginX * 2;
   const totalBs = +(period.accounts_receivable_usd * period.exchange_rate_bs).toFixed(2);
   const emissionDate = new Date().toLocaleDateString('es-VE');
-  const totalPages = 1;
+  const totalPages = 2;
 
   // =========================================================================
-  // HOJA ÚNICA: TARJETAS DE RESUMEN POR GRUPO DE DEUDAS (SIN DETALLE POR APTO)
+  // HOJA 1: TARJETAS DE RESUMEN POR GRUPO DE DEUDAS (ESTILO APP MÓVIL)
   // =========================================================================
   const p1: string[] = [];
   let cursorY = drawAppHeaderBanner(
@@ -922,7 +923,376 @@ export function downloadAccountsReceivableWhatsappPdf(
     'left'
   );
 
-  const bytes = compileMultiPagePdf([p1.join('\n')], pageWidth, 841.89);
+  // =========================================================================
+  // HOJA 2: RELACIÓN DE DEUDA AGRUPADA POR COLORES (DISEÑO IMAGEN OFICIAL)
+  // =========================================================================
+  const p2: string[] = [];
+  const p2MarginX = 34;
+  const p2ContentW = pageWidth - p2MarginX * 2;
+
+  // Fondo general azul hielo muy suave estilo infografía (#eef4fa)
+  drawRoundedBox(
+    p2,
+    16,
+    16,
+    pageWidth - 32,
+    pageHeight - 32,
+    18,
+    [0.937, 0.961, 0.984],
+    [0.80, 0.85, 0.91],
+    1
+  );
+
+  // Título Principal Centrado en 2 líneas como en la imagen
+  drawText(
+    p2,
+    'RESIDENCIAS DAN TORRE A - -',
+    pageWidth / 2,
+    804,
+    14.5,
+    [0.145, 0.259, 0.396],
+    true,
+    'center'
+  );
+  drawText(
+    p2,
+    `RELACIÓN DE DEUDA (${period.year})`,
+    pageWidth / 2,
+    787,
+    14.5,
+    [0.145, 0.259, 0.396],
+    true,
+    'center'
+  );
+
+  // Línea horizontal divisoria debajo del título
+  p2.push('q 0.56 0.65 0.74 RG 1.3 w');
+  p2.push(`${p2MarginX.toFixed(2)} 779.00 m ${(p2MarginX + p2ContentW).toFixed(2)} 779.00 l S`);
+  p2.push('Q');
+
+  interface Page2GroupConfig {
+    key: '1' | '2' | '3' | '4+';
+    bannerTitle: string;
+    subtotalLabel: string;
+    pillFill: RgbColor;
+    pillStroke: RgbColor;
+    colHeaderFill: RgbColor;
+    rowEvenFill: RgbColor;
+    rowOddFill: RgbColor;
+    subtotalFill: RgbColor;
+    gridStroke: RgbColor;
+  }
+
+  const page2Groups: Page2GroupConfig[] = [
+    {
+      key: '1',
+      bannerTitle: 'Grupo 1 Recibo',
+      subtotalLabel: 'Subtotal Grupo 1',
+      pillFill: [0.557, 0.733, 0.545],
+      pillStroke: [0.35, 0.49, 0.34],
+      colHeaderFill: [0.427, 0.635, 0.416],
+      rowEvenFill: [0.925, 0.969, 0.922],
+      rowOddFill: [0.855, 0.933, 0.851],
+      subtotalFill: [0.808, 0.910, 0.800],
+      gridStroke: [0.64, 0.79, 0.63],
+    },
+    {
+      key: '2',
+      bannerTitle: 'Grupo 2 Recibos',
+      subtotalLabel: 'Subtotal Grupo 2',
+      pillFill: [0.518, 0.608, 0.820],
+      pillStroke: [0.33, 0.40, 0.58],
+      colHeaderFill: [0.388, 0.494, 0.745],
+      rowEvenFill: [0.925, 0.945, 0.988],
+      rowOddFill: [0.847, 0.886, 0.969],
+      subtotalFill: [0.788, 0.843, 0.957],
+      gridStroke: [0.63, 0.71, 0.87],
+    },
+    {
+      key: '3',
+      bannerTitle: 'Grupo 3 Recibos',
+      subtotalLabel: 'Subtotal Grupo 3',
+      pillFill: [0.667, 0.525, 0.737],
+      pillStroke: [0.46, 0.33, 0.53],
+      colHeaderFill: [0.576, 0.408, 0.663],
+      rowEvenFill: [0.957, 0.929, 0.976],
+      rowOddFill: [0.902, 0.855, 0.937],
+      subtotalFill: [0.863, 0.800, 0.914],
+      gridStroke: [0.74, 0.64, 0.81],
+    },
+    {
+      key: '4+',
+      bannerTitle: 'Grupo 4 Ó Más Recibos',
+      subtotalLabel: 'Subtotal Morosidad',
+      pillFill: [0.757, 0.490, 0.392],
+      pillStroke: [0.54, 0.31, 0.23],
+      colHeaderFill: [0.690, 0.392, 0.278],
+      rowEvenFill: [0.988, 0.933, 0.894],
+      rowOddFill: [0.969, 0.878, 0.816],
+      subtotalFill: [0.953, 0.835, 0.757],
+      gridStroke: [0.84, 0.68, 0.58],
+    },
+  ];
+
+  let p2Y = 772;
+  const col1W = p2ContentW * 0.36; // Apartamento
+  const col2W = p2ContentW * 0.28; // Recibos
+  const col3W = p2ContentW * 0.36; // Total (USD)
+  const col1Center = p2MarginX + col1W / 2;
+  const col2Center = p2MarginX + col1W + col2W / 2;
+  const col3Center = p2MarginX + col1W + col2W + col3W / 2;
+
+  for (const grp of page2Groups) {
+    const items = receivables
+      .filter((r) => r.bracket === grp.key && r.amount_usd > 0)
+      .sort((a, b) => {
+        if (grp.key === '4+') {
+          return (
+            b.pending_months - a.pending_months ||
+            b.amount_usd - a.amount_usd ||
+            a.floor_number - b.floor_number ||
+            a.apt_in_floor - b.apt_in_floor
+          );
+        }
+        return a.floor_number - b.floor_number || a.apt_in_floor - b.apt_in_floor;
+      });
+
+    const grpSubtotalUsd = +items.reduce((acc, r) => acc + r.amount_usd, 0).toFixed(2);
+
+    // 1. Píldora superior de título de grupo ("Grupo 1 Recibo", etc.)
+    const pillH = 18.5;
+    p2Y -= pillH;
+    drawRoundedBox(
+      p2,
+      p2MarginX,
+      p2Y,
+      p2ContentW,
+      pillH,
+      6,
+      grp.pillFill,
+      grp.pillStroke,
+      0.8
+    );
+    drawText(
+      p2,
+      grp.bannerTitle,
+      pageWidth / 2,
+      p2Y + 5.0,
+      10.8,
+      [1, 1, 1],
+      true,
+      'center'
+    );
+
+    p2Y -= 2.5; // Pequeña separación entre la píldora y la tabla
+
+    // Dimensiones de la tabla del grupo
+    const colHeaderH = 15.0;
+    const rowH = 12.6;
+    const subtotalH = 15.5;
+    const tableH = colHeaderH + items.length * rowH + subtotalH;
+    const tableBottomY = p2Y - tableH;
+
+    // Recorte redondeado para toda la tabla del grupo
+    p2.push('q');
+    p2.push(pdfRoundedRectPath(p2MarginX, tableBottomY, p2ContentW, tableH, 6));
+    p2.push('W n');
+
+    // 2. Fila de Encabezado de Columnas (Apartamento | Recibos | Total (USD))
+    const colHeaderY = p2Y - colHeaderH;
+    p2.push(rgbFill(grp.colHeaderFill));
+    p2.push(`${p2MarginX.toFixed(2)} ${colHeaderY.toFixed(2)} ${p2ContentW.toFixed(2)} ${colHeaderH.toFixed(2)} re f`);
+
+    drawText(p2, 'Apartamento', col1Center, colHeaderY + 4.2, 9.2, [1, 1, 1], true, 'center');
+    drawText(p2, 'Recibos', col2Center, colHeaderY + 4.2, 9.2, [1, 1, 1], true, 'center');
+    drawText(p2, 'Total (USD)', col3Center, colHeaderY + 4.2, 9.2, [1, 1, 1], true, 'center');
+
+    // 3. Filas de Apartamentos del Grupo
+    let rowCursorY = colHeaderY;
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      rowCursorY -= rowH;
+      const fill = idx % 2 === 0 ? grp.rowEvenFill : grp.rowOddFill;
+      p2.push(rgbFill(fill));
+      p2.push(`${p2MarginX.toFixed(2)} ${rowCursorY.toFixed(2)} ${p2ContentW.toFixed(2)} ${rowH.toFixed(2)} re f`);
+
+      // Línea horizontal divisoria de fila
+      p2.push(`${rgbStroke(grp.gridStroke)} 0.45 w`);
+      p2.push(`${p2MarginX.toFixed(2)} ${rowCursorY.toFixed(2)} m ${(p2MarginX + p2ContentW).toFixed(2)} ${rowCursorY.toFixed(2)} l S`);
+
+      // Formato "Apto 012", "Apto 031", "Apto 122" idéntico a la imagen
+      const aptCode3Digits = `${item.floor_number}${item.apt_in_floor}`.padStart(3, '0');
+      const aptLabel = `Apto ${aptCode3Digits}`;
+
+      drawText(p2, aptLabel, col1Center, rowCursorY + 3.4, 8.7, [0.08, 0.10, 0.14], true, 'center');
+      drawText(
+        p2,
+        String(item.pending_months),
+        col2Center,
+        rowCursorY + 3.4,
+        8.7,
+        [0.08, 0.10, 0.14],
+        true,
+        'center'
+      );
+      drawText(
+        p2,
+        `$${formatNumberVe(item.amount_usd)}`,
+        col3Center,
+        rowCursorY + 3.4,
+        8.7,
+        [0.08, 0.10, 0.14],
+        true,
+        'center'
+      );
+    }
+
+    // Líneas verticales divisorias de las 3 columnas (desde el encabezado hasta antes del subtotal)
+    const gridTopY = p2Y;
+    const gridBottomY = tableBottomY + subtotalH;
+    p2.push(`${rgbStroke(grp.gridStroke)} 0.5 w`);
+    p2.push(`${(p2MarginX + col1W).toFixed(2)} ${gridBottomY.toFixed(2)} m ${(p2MarginX + col1W).toFixed(2)} ${gridTopY.toFixed(2)} l S`);
+    p2.push(`${(p2MarginX + col1W + col2W).toFixed(2)} ${gridBottomY.toFixed(2)} m ${(p2MarginX + col1W + col2W).toFixed(2)} ${gridTopY.toFixed(2)} l S`);
+
+    // 4. Barra inferior de Subtotal del Grupo
+    p2.push(rgbFill(grp.subtotalFill));
+    p2.push(`${p2MarginX.toFixed(2)} ${tableBottomY.toFixed(2)} ${p2ContentW.toFixed(2)} ${subtotalH.toFixed(2)} re f`);
+    drawText(
+      p2,
+      `${grp.subtotalLabel}: $${formatNumberVe(grpSubtotalUsd)} USD`,
+      p2MarginX + p2ContentW - 14,
+      tableBottomY + 4.3,
+      9.6,
+      [0.05, 0.07, 0.11],
+      true,
+      'right'
+    );
+
+    p2.push('Q'); // Fin del clip redondeado de la tabla
+
+    // Borde exterior redondeado de la tabla
+    drawRoundedBox(
+      p2,
+      p2MarginX,
+      tableBottomY,
+      p2ContentW,
+      tableH,
+      6,
+      undefined,
+      grp.pillStroke,
+      0.75
+    );
+
+    p2Y = tableBottomY - 7.5; // Espacio antes del siguiente grupo
+  }
+
+  // =========================================================================
+  // BANNER INFERIOR: TOTAL DEUDA PENDIENTE COBRABLE (CON ÍCONOS VECTORIALES)
+  // =========================================================================
+  const totalBannerH = 44;
+  const totalBannerY = p2Y - totalBannerH - 1;
+
+  // Sombra sutil y caja redondeada gris azulada como en la imagen
+  drawRoundedBox(
+    p2,
+    p2MarginX + 1.5,
+    totalBannerY - 2,
+    p2ContentW,
+    totalBannerH,
+    10,
+    [0.78, 0.82, 0.87]
+  );
+  drawRoundedBox(
+    p2,
+    p2MarginX,
+    totalBannerY,
+    p2ContentW,
+    totalBannerH,
+    10,
+    [0.847, 0.875, 0.910],
+    [0.52, 0.58, 0.66],
+    0.9
+  );
+
+  // Ícono 1: Monedero terracota + Pila de monedas doradas (izquierda)
+  const purseX = p2MarginX + 16;
+  const purseY = totalBannerY + 8;
+  drawRoundedBox(p2, purseX, purseY, 26, 20, 7, [0.745, 0.365, 0.314], [0.28, 0.14, 0.12], 0.8);
+  // Broche superior del monedero
+  drawRoundedBox(p2, purseX + 6, purseY + 19, 14, 4, 2, [0.85, 0.72, 0.45], [0.28, 0.14, 0.12], 0.7);
+  // Pila de monedas doradas junto al monedero
+  drawRoundedBox(p2, purseX + 21, purseY, 11, 5, 2, [0.93, 0.76, 0.32], [0.35, 0.25, 0.08], 0.6);
+  drawRoundedBox(p2, purseX + 21, purseY + 4.5, 11, 5, 2, [0.96, 0.81, 0.38], [0.35, 0.25, 0.08], 0.6);
+  drawRoundedBox(p2, purseX + 21, purseY + 9, 11, 5, 2, [0.98, 0.85, 0.44], [0.35, 0.25, 0.08], 0.6);
+
+  // Ícono 2: Fajo de billetes verdes con cinta + círculo indicador (al lado del monedero)
+  const billsX = p2MarginX + 58;
+  const billsY = totalBannerY + 9;
+  drawRoundedBox(p2, billsX, billsY, 32, 16, 2.5, [0.420, 0.659, 0.498], [0.18, 0.32, 0.22], 0.7);
+  drawRoundedBox(p2, billsX + 2, billsY + 4, 32, 16, 2.5, [0.518, 0.765, 0.588], [0.18, 0.32, 0.22], 0.7);
+  // Cinta blanca central del fajo de billetes
+  drawRoundedBox(p2, billsX + 13, billsY + 4, 8, 16, 1, [0.92, 0.95, 0.98], [0.30, 0.40, 0.35], 0.6);
+  // Círculo celeste indicador en la esquina inferior derecha de los billetes
+  drawRoundedBox(p2, billsX + 28, billsY - 1, 13, 13, 6.5, [0.68, 0.82, 0.94], [0.22, 0.32, 0.45], 0.8);
+  drawText(p2, '-', billsX + 34.5, billsY + 2.2, 10, [0.18, 0.28, 0.40], true, 'center');
+
+  // Textos centrales: "TOTAL DEUDA PENDIENTE" / "COBRABLE:"
+  drawText(
+    p2,
+    'TOTAL DEUDA PENDIENTE',
+    p2MarginX + 266,
+    totalBannerY + 25,
+    9.5,
+    [0.07, 0.09, 0.13],
+    true,
+    'right'
+  );
+  drawText(
+    p2,
+    'COBRABLE:',
+    p2MarginX + 266,
+    totalBannerY + 10,
+    13.5,
+    [0.05, 0.07, 0.11],
+    true,
+    'right'
+  );
+
+  // Monto Total en grande a la derecha ("$1.973,90 USD")
+  drawText(
+    p2,
+    `$${formatNumberVe(period.accounts_receivable_usd)}`,
+    p2MarginX + p2ContentW - 50,
+    totalBannerY + 13,
+    24,
+    [0.145, 0.259, 0.396],
+    true,
+    'right'
+  );
+  drawText(
+    p2,
+    'USD',
+    p2MarginX + p2ContentW - 14,
+    totalBannerY + 13,
+    12.5,
+    [0.145, 0.259, 0.396],
+    true,
+    'right'
+  );
+
+  // Pie de página sutil de la Hoja 2
+  drawText(
+    p2,
+    `Equivalente referencial BCV (Bs. ${formatNumberVe(period.exchange_rate_bs)}): Bs. ${formatNumberVe(totalBs)}   |   Pag. 2 de ${totalPages}`,
+    pageWidth / 2,
+    23,
+    7.8,
+    [0.39, 0.45, 0.55],
+    true,
+    'center'
+  );
+
+  const bytes = compileMultiPagePdf([p1.join('\n'), p2.join('\n')], pageWidth, pageHeight);
   const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
