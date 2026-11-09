@@ -1,5 +1,9 @@
 import { CondominiumInfo, Expense, MonthlyPeriod } from '@/types/condo';
-import { DebtBracketSummary, ReceivableAccountItem } from '@/lib/mock-data';
+import {
+  ACCOUNTS_RECEIVABLE_LIST,
+  DebtBracketSummary,
+  ReceivableAccountItem,
+} from '@/lib/mock-data';
 
 /**
  * Formatea cualquier número utilizando puntos (.) para los miles y comas (,) para los decimales.
@@ -1042,8 +1046,38 @@ export function downloadAccountsReceivableWhatsappPdf(
   const col2Center = p2MarginX + col1W + col2W / 2;
   const col3Center = p2MarginX + col1W + col2W + col3W / 2;
 
+  const baseReceivables =
+    Array.isArray(receivables) && receivables.some((r) => r.amount_usd > 0)
+      ? receivables
+      : ACCOUNTS_RECEIVABLE_LIST;
+
+  const normalizedReceivables = baseReceivables.map((r) => {
+    const rawDigits = String(r.unit || '').replace(/\D/g, '');
+    const floorNum =
+      r.floor_number || (rawDigits.length >= 2 ? parseInt(rawDigits.slice(0, -1), 10) : 1);
+    const aptInFloor =
+      r.apt_in_floor || (rawDigits.length >= 1 ? parseInt(rawDigits.slice(-1), 10) : 1);
+    const computedBracket =
+      r.bracket ||
+      (r.pending_months === 1
+        ? '1'
+        : r.pending_months === 2
+          ? '2'
+          : r.pending_months === 3
+            ? '3'
+            : r.pending_months >= 4
+              ? '4+'
+              : '0');
+    return {
+      ...r,
+      floor_number: floorNum,
+      apt_in_floor: aptInFloor,
+      bracket: computedBracket,
+    };
+  });
+
   for (const grp of page2Groups) {
-    const items = receivables
+    const items = normalizedReceivables
       .filter((r) => r.bracket === grp.key && r.amount_usd > 0)
       .sort((a, b) => {
         if (grp.key === '4+') {
@@ -1297,7 +1331,7 @@ export function downloadAccountsReceivableWhatsappPdf(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Resumen_Cuentas_por_Cobrar_${period.label.replace(/\s+/g, '_')}_WhatsApp.pdf`;
+  link.download = `Resumen_Cobranza_2_Hojas_${period.label.replace(/\s+/g, '_')}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

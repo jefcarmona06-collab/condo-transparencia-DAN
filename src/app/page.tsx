@@ -384,28 +384,28 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const savedExpenses = localStorage.getItem('dan_v2_expenses');
+      const savedExpenses = localStorage.getItem('dan_v5_expenses');
       if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
 
-      const savedPeriods = localStorage.getItem('dan_v3_periods');
+      const savedPeriods = localStorage.getItem('dan_v5_periods');
       if (savedPeriods) setPeriods(JSON.parse(savedPeriods));
 
-      const savedReceivables = localStorage.getItem('dan_v3_receivables');
+      const savedReceivables = localStorage.getItem('dan_v5_receivables');
       if (savedReceivables) setReceivablesList(JSON.parse(savedReceivables));
 
-      const savedBalance = localStorage.getItem('dan_v2_bank_balance');
+      const savedBalance = localStorage.getItem('dan_v5_bank_balance');
       if (savedBalance) setBankBalanceUsd(parseFloat(savedBalance));
 
-      const savedBankDetails = localStorage.getItem('dan_v2_bank_details');
+      const savedBankDetails = localStorage.getItem('dan_v5_bank_details');
       if (savedBankDetails) setBankDetails(JSON.parse(savedBankDetails));
 
-      const savedBoard = localStorage.getItem('dan_v1_board_members');
+      const savedBoard = localStorage.getItem('dan_v5_board_members');
       if (savedBoard) setBoardMembers(JSON.parse(savedBoard));
 
-      const savedProjects = localStorage.getItem('dan_v1_projects');
+      const savedProjects = localStorage.getItem('dan_v5_projects');
       if (savedProjects) setProjects(JSON.parse(savedProjects));
 
-      const savedFundsConfig = localStorage.getItem('dan_v2_funds_config');
+      const savedFundsConfig = localStorage.getItem('dan_v5_funds_config');
       if (savedFundsConfig) setFundsConfig(JSON.parse(savedFundsConfig));
     } catch (err) {
       console.warn('Error hidratando localStorage:', err);
@@ -418,7 +418,7 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
-      localStorage.setItem('dan_v2_expenses', JSON.stringify(expenses));
+      localStorage.setItem('dan_v5_expenses', JSON.stringify(expenses));
     } catch (e) {
       console.warn('Cuota de localStorage alcanzada en expenses:', e);
     }
@@ -427,13 +427,13 @@ export default function ResidenciasDanPortal() {
   useEffect(() => {
     if (!isStorageHydrated || typeof window === 'undefined') return;
     try {
-      localStorage.setItem('dan_v3_periods', JSON.stringify(periods));
-      localStorage.setItem('dan_v3_receivables', JSON.stringify(receivablesList));
-      localStorage.setItem('dan_v2_bank_balance', bankBalanceUsd.toString());
-      localStorage.setItem('dan_v2_bank_details', JSON.stringify(bankDetails));
-      localStorage.setItem('dan_v1_board_members', JSON.stringify(boardMembers));
-      localStorage.setItem('dan_v1_projects', JSON.stringify(projects));
-      localStorage.setItem('dan_v2_funds_config', JSON.stringify(fundsConfig));
+      localStorage.setItem('dan_v5_periods', JSON.stringify(periods));
+      localStorage.setItem('dan_v5_receivables', JSON.stringify(receivablesList));
+      localStorage.setItem('dan_v5_bank_balance', bankBalanceUsd.toString());
+      localStorage.setItem('dan_v5_bank_details', JSON.stringify(bankDetails));
+      localStorage.setItem('dan_v5_board_members', JSON.stringify(boardMembers));
+      localStorage.setItem('dan_v5_projects', JSON.stringify(projects));
+      localStorage.setItem('dan_v5_funds_config', JSON.stringify(fundsConfig));
     } catch (e) {
       console.warn('Error guardando estado en localStorage:', e);
     }
@@ -2350,7 +2350,7 @@ export default function ResidenciasDanPortal() {
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2.5 text-[11px] font-extrabold text-white shadow-sm"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      Resumen PDF
+                      Resumen PDF (2 Hojas)
                     </button>
                   </div>
                 </div>
